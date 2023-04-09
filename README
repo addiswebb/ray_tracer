@@ -2,3 +2,8 @@ create a quad with vertices and index buffer
 create and edit a texture using a compute shader
 display the texture using the fragment shader
 
+create a uniform buffer to store data for render pass, width/height of the screen etc
+start on the ray tracing code within shader.
+create a uniform buffer to store data for compute pass, holds info about the scene, list<Sphere> 
+create interactive camera for moving around in the scene
+
