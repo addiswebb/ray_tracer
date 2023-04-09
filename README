@@ -1,2 +1,4 @@
-* texture to be shared between compute and fragment shader
+create a quad with vertices and index buffer
+create and edit a texture using a compute shader
+display the texture using the fragment shader
 

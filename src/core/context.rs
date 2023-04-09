@@ -1,8 +1,18 @@
-use std::time::Duration;
-
 use imgui_winit_support::winit::{self, event::WindowEvent};
+use wgpu::util::DeviceExt;
 
 use super::{window::Window, imgui::ImguiLayer};
+
+const VERTICES: &[[f32;2];4] = &[
+    [-1.0,1.0],
+    [1.0,1.0],
+    [-1.0,-1.0],
+    [1.0,-1.0],
+];
+const INDICES: &[u16] = &[
+    0,3,1,
+    0,2,3
+];
 
 pub struct Context{
     pub device: wgpu::Device,
@@ -11,6 +21,8 @@ pub struct Context{
     pub config: wgpu::SurfaceConfiguration,
     pub pipeline: wgpu::RenderPipeline,
     pub imgui_layer: ImguiLayer,
+    pub vertex_buffer: wgpu::Buffer,
+    pub index_buffer: wgpu::Buffer,
 }
 
 impl Context{
@@ -65,13 +77,28 @@ impl Context{
             label: Some("Shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("../../shaders/shader.wgsl").into()),
         });
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(VERTICES),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
+            label: Some("Index Buffer"),
+            contents: bytemuck::cast_slice(INDICES),
+            usage: wgpu::BufferUsages::INDEX,
+        });
+
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor{
             label: Some(&format!("{:?}", shader)),
             layout: Some(&layout),
             vertex: wgpu::VertexState{
                 module: &shader,
                 entry_point: "vert",
-                buffers: &[],
+                buffers: &[wgpu::VertexBufferLayout{
+                    array_stride: std::mem::size_of::<[f32;2]>() as wgpu::BufferAddress,
+                    step_mode: wgpu::VertexStepMode::Vertex,
+                    attributes: &wgpu::vertex_attr_array![0=> Float32x2],
+                }],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -115,6 +142,8 @@ impl Context{
             config,
             pipeline,
             imgui_layer,
+            vertex_buffer,
+            index_buffer,
         }
     }
 
@@ -156,9 +185,13 @@ impl Context{
                 })],
                 depth_stencil_attachment: None,
             });
+            
+            render_pass.set_pipeline(&self.pipeline);
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.draw_indexed(0..INDICES.len() as u32,0, 0..1);
 
             let mut opened = true;
-            let mut closed = true;
 
             let ui = self.imgui_layer.context.frame();
             {

@@ -22,10 +22,10 @@ impl ImguiLayer{
         context.io_mut().config_flags |= imgui::ConfigFlags::DOCKING_ENABLE;
         
         let mut platform = imgui_winit_support::WinitPlatform::init(&mut context);
-        /*   
-            Uncomment to stop imgui from saving state when closed     
-            context.set_ini_filename(None); 
-        */
+          
+/*             Uncomment to stop imgui from saving state when closed      */
+/*         context.set_ini_filename(None);  */
+       
 
         let hidpi_factor = window.scale_factor();
         let font_size = (13.0 * hidpi_factor) as f32;
