@@ -4,6 +4,8 @@ use wgpu::util::DeviceExt;
 
 use super::{window::Window, imgui::ImguiLayer, texture::Texture};
 
+const WORKGROUP_SIZE: (u32, u32) = (8, 8);
+
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 struct Vertex {
@@ -21,6 +23,9 @@ pub struct Context{
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
     pub bind_group: wgpu::BindGroup,
+    pub compute_pipeline: wgpu::ComputePipeline,
+    pub compute_bind_group: wgpu::BindGroup,
+    pub texture: Texture,
 }
 
 impl Context{
@@ -30,7 +35,6 @@ impl Context{
             _tex_coord: [tc[0] as f32, tc[1] as f32],
         }
     }
-
     fn create_vertices() -> (Vec<Vertex>, Vec<u16>) {
         let vertex_data = [
             Context::vertex([-1,-1], [0, 0]),
@@ -93,8 +97,13 @@ impl Context{
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor{
             label: Some("Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../../shaders/shader.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../../shaders/render.wgsl").into()),
         });
+        let compute_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor{
+            label: Some("Compute Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../../shaders/ray_tracer.wgsl").into())
+        });
+
         let (vertices, indices) = Context::create_vertices();
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
             label: Some("Vertex Buffer"),
@@ -106,7 +115,8 @@ impl Context{
             contents: bytemuck::cast_slice(&indices),
             usage: wgpu::BufferUsages::INDEX,
         });
-        let texture = Texture::new(&device,800,600,wgpu::TextureFormat::Rgba32Float);
+//Todo: create new texture every resize witht the correct size
+        let texture = Texture::new(&device,config.width,config.height,wgpu::TextureFormat::Rgba32Float);
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Bind Group Layout"),
@@ -184,6 +194,44 @@ impl Context{
             multiview: None,
         });
 
+        let compute_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor{
+            label: Some("Compute Bind Group Layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::StorageTexture {
+                        access: wgpu::StorageTextureAccess::WriteOnly,
+                        format: wgpu::TextureFormat::Rgba32Float,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                    },
+                    count: None,
+                },
+            ],
+        });
+        let compute_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor{
+            label: Some("Compute Bind Group"),
+            layout: &compute_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: texture.binding_resource(),
+                },
+            ],
+        });
+
+        let compute_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor{
+            label: Some("Compute Pipeline layout"),
+            bind_group_layouts: &[&compute_bind_group_layout],
+            push_constant_ranges: &[],
+        });
+        let compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("Compute Pipeline"),
+            layout: Some(&compute_layout),
+            module: &compute_shader,
+            entry_point: "main",
+        });
+
         let imgui_layer = ImguiLayer::new(window.as_ref(), &config, &device, &queue).await;
 
         Self{
@@ -196,6 +244,9 @@ impl Context{
             vertex_buffer,
             index_buffer,
             bind_group,
+            compute_pipeline,
+            compute_bind_group,
+            texture,
         }
     }
 
@@ -204,6 +255,7 @@ impl Context{
             self.config.width = size.width;
             self.config.height = size.height;
             self.surface.configure(&self.device, &self.config);
+            self.texture = Texture::new(&self.device,size.width,size.height,wgpu::TextureFormat::Rgba32Float);
         }
     }
     pub fn input(&mut self, event: &WindowEvent) -> bool {
@@ -225,6 +277,19 @@ impl Context{
         });
 
         {
+            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor{
+                label: Some("Compute Pass"),
+            });
+            let xdim = self.config.width + WORKGROUP_SIZE.0 - 1;
+            let xgroups = xdim / WORKGROUP_SIZE.0;
+            let ydim = self.config.height + WORKGROUP_SIZE.1 - 1;
+            let ygroups = ydim / WORKGROUP_SIZE.1;
+
+            compute_pass.set_pipeline(&self.compute_pipeline);
+            compute_pass.set_bind_group(0, &self.compute_bind_group, &[]);
+            compute_pass.dispatch_workgroups(xgroups,ygroups,1);
+        }
+        {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor{
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment{
@@ -237,6 +302,7 @@ impl Context{
                 })],
                 depth_stencil_attachment: None,
             });
+
             
             render_pass.set_pipeline(&self.pipeline);
             render_pass.set_bind_group(0, &self.bind_group,&[]);

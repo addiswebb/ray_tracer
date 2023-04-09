@@ -11,7 +11,7 @@ impl Texture {
         format: wgpu::TextureFormat,
     ) -> Self {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: None,
+            label: Some("Main Texture"),
             size: wgpu::Extent3d {
                 width,
                 height,

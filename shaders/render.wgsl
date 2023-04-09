@@ -20,7 +20,7 @@ var texture: texture_storage_2d<rgba32float,read_write>;
 
 @fragment
 fn frag(i: VertexOutput) -> @location(0) vec4<f32>{
-    var coord: vec2<i32> = vec2<i32>(i32(i.tex_coord.x),i32(i.tex_coord.y));
+    var coord: vec2<i32> = vec2<i32>(i32(i.tex_coord.x * 800.0),i32(i.tex_coord.y * 600.0));
     var color: vec4<f32> = textureLoad(texture, coord);
     return color;
 }
