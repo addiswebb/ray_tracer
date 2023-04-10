@@ -11,7 +11,7 @@ impl Texture {
         format: wgpu::TextureFormat,
     ) -> Self {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Main Texture"),
+            label: None,
             size: wgpu::Extent3d {
                 width,
                 height,
@@ -42,7 +42,7 @@ impl Texture {
     ) -> wgpu::BindingType {
         wgpu::BindingType::StorageTexture {
             access,
-            format: self.format,
+            format: wgpu::TextureFormat::Rgba32Float,
             view_dimension: wgpu::TextureViewDimension::D2,
         }
     }

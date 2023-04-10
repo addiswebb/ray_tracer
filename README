@@ -1,9 +1,25 @@
 create a quad with vertices and index buffer
 create and edit a texture using a compute shader
 display the texture using the fragment shader
-
 create a uniform buffer to store data for render pass, width/height of the screen etc
 start on the ray tracing code within shader.
+
 create a uniform buffer to store data for compute pass, holds info about the scene, list<Sphere> 
 create interactive camera for moving around in the scene
+refactor code to make it cleaner
 
+
+var cam: Camera;
+cam.near = 0.1;
+cam.fov = 40.0;
+cam.aspect = 1000.0/750.0;
+
+let x = cam.fov*0.5*0.0174533;
+let plane_height = cam.near * tan(x) * 2.0;
+let plane_width = plane_height * cam.aspect;
+
+let view_params = vec3<f32>(plane_width,plane_height,cam.near);
+let view_point = vec3<f32>(i.pos-vec2<f32>(0.5,0.5),1.0);
+
+let dir = view_point / vec3<f32>(i.size,1.0);
+return vec4<f32>(dir,1.0);

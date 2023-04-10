@@ -15,12 +15,20 @@ fn vert(i: VertexInput) -> VertexOutput{
     out.tex_coord = i.tex_coord;
     return out;
 }
+
+struct Params{
+    width: u32,
+    height: u32,
+};
+
 @group(0) @binding(0)
+var<uniform> params: Params;
+@group(0) @binding(1)
 var texture: texture_storage_2d<rgba32float,read_write>;
 
 @fragment
 fn frag(i: VertexOutput) -> @location(0) vec4<f32>{
-    var coord: vec2<i32> = vec2<i32>(i32(i.tex_coord.x * 800.0),i32(i.tex_coord.y * 600.0));
+    var coord: vec2<i32> = vec2<i32>(i32(i.tex_coord.x * f32(params.width)),i32(i.tex_coord.y * f32(params.height)));
     var color: vec4<f32> = textureLoad(texture, coord);
     return color;
 }

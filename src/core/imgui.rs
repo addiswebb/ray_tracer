@@ -1,9 +1,5 @@
-use std::path::Path;
-
 use imgui_wgpu::{RendererConfig, Renderer};
 use imgui_winit_support::winit::{self, event::Event};
-
-use super::resources::load_binary;
 
 pub struct ImguiLayer{
     pub context: imgui::Context,
@@ -26,33 +22,9 @@ impl ImguiLayer{
 /*             Uncomment to stop imgui from saving state when closed      */
 /*         context.set_ini_filename(None);  */
        
-
         let hidpi_factor = window.scale_factor();
-        let font_size = (13.0 * hidpi_factor) as f32;
             
         context.io_mut().font_global_scale = (1.0 / hidpi_factor) as f32;
-
-        //load fonts
-        /* let font_data = load_binary(
-            &Path::new("assets")
-            .join("fonts")
-            .join("proggyclean.ttf")
-        ).await.unwrap();
-
-        let segoe_ui_font = imgui::FontSource::TtfData {
-            data: &font_data,
-            size_pixels: font_size,
-            config: Some(
-                imgui::FontConfig{
-                    oversample_h: 1,
-                    pixel_snap_h: true,
-                    size_pixels: font_size,
-                    ..Default::default()
-                }
-            ), 
-        };
-
-        context.fonts().add_font(&[segoe_ui_font]); */
 
         //Setup imgui renderer
         let renderer_config = RendererConfig{

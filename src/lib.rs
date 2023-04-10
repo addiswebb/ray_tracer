@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use crate::{core::{*, context::Context}};
 
 use imgui_winit_support::winit::{event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode}, event_loop::ControlFlow};
