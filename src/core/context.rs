@@ -1,9 +1,7 @@
 use std::mem;
 
 use bytemuck::{Pod, Zeroable};
-use glam::vec2;
 use imgui_winit_support::winit::{self, event::WindowEvent};
-use mint::Vector2;
 use wgpu::util::DeviceExt;
 
 use super::{window::Window, imgui::ImguiLayer, texture::Texture};
@@ -306,7 +304,6 @@ impl Context{
                 width: size.width,
                 height: size.height,
             };
-            println!("Params: {:?}",params);
             self.queue.write_buffer(&self.params, 0, bytemuck::cast_slice(&[params]));
             self.compute_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor{
                 label: Some("Compute Bind Group"),
@@ -358,8 +355,6 @@ impl Context{
         let output = self.surface.get_current_texture()?;
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let mut textures = imgui::Textures::new();
-        let texture_id = textures.insert(self.texture.binding_resource());
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor{
             label: Some("Command Encoder")
         });

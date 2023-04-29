@@ -48,14 +48,6 @@ impl ImguiLayer{
             .expect("Failed to render imgui");
         Ok(())
     }
-
-    pub fn attach(&mut self, window: &winit::window::Window) {
-        self.platform.attach_window(
-            self.context.io_mut(),
-            window,
-            imgui_winit_support::HiDpiMode::Default,
-        );
-    }
     pub fn event(&mut self, window: &winit::window::Window, event: &Event<()>) -> bool {
         self.platform.handle_event(self.context.io_mut(), window, event);
         return true;
