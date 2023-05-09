@@ -1,6 +1,6 @@
 use crate::{core::{*, context::Context}};
 
-use imgui_winit_support::winit::{event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode}, event_loop::ControlFlow};
+use imgui_winit_support::winit::{event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode, DeviceEvent}, event_loop::ControlFlow};
 use window::Window;
 
 mod core;
@@ -12,13 +12,16 @@ pub async fn run(){
         .init();
     log::info!("Starting Ray Tracer");
     log::info!("Creating Window: 800x600");
-    let window: Window = Window::new().title("Ray Tracer").size(800,600).build();
+    let window: Window = Window::new().title("Ray Tracer").size(800,800).build();
 
     let mut context = Context::new(&window).await;
 
     log::info!("Starting event_loop");
     window.event_loop.run(move |event, _, control_flow| {
         match event{
+            //Event::DeviceEvent { event: DeviceEvent::MouseMotion{delta,}, ..  } => {
+               // context.camera.process_mouse(delta.0, delta.1)
+            //}
             Event::MainEventsCleared => window.raw.request_redraw(),
             Event::WindowEvent{ ref event, window_id, } if window_id == window.raw.id() => 
                 if !context.input(&event){

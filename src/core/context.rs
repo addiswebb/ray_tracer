@@ -1,10 +1,11 @@
 use std::mem;
 
 use bytemuck::{Pod, Zeroable};
-use imgui_winit_support::winit::{self, event::WindowEvent};
+use glam::Vec3;
+use imgui_winit_support::winit::{self, event::{WindowEvent, KeyboardInput}};
 use wgpu::util::DeviceExt;
 
-use super::{window::Window, imgui::ImguiLayer, texture::Texture};
+use super::{window::Window, imgui::ImguiLayer, texture::Texture, camera::{Camera, CameraUniform}};
 
 const WORKGROUP_SIZE: (u32, u32) = (8, 8);
 
@@ -38,6 +39,7 @@ pub struct Context{
     pub compute_bind_group_layout: wgpu::BindGroupLayout,
     pub texture: Texture,
     pub params: wgpu::Buffer,
+    pub camera: Camera,
 }
 
 impl Context{
@@ -127,7 +129,7 @@ impl Context{
             contents: bytemuck::cast_slice(&indices),
             usage: wgpu::BufferUsages::INDEX,
         });
-
+        println!("{} {}", config.width, config.height);
         let params = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("parameters buffer"),
             contents: bytemuck::bytes_of(&
@@ -137,6 +139,7 @@ impl Context{
             }),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
+
         let texture = Texture::new(&device,config.width,config.height,wgpu::TextureFormat::Rgba32Float);
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -186,11 +189,13 @@ impl Context{
             vertex: wgpu::VertexState{
                 module: &shader,
                 entry_point: "vert",
-                buffers: &[wgpu::VertexBufferLayout{
-                    array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
-                    step_mode: wgpu::VertexStepMode::Vertex,
-                    attributes: &wgpu::vertex_attr_array![0=> Float32x4,1=>Float32x2],
-                }],
+                buffers: &[
+                    wgpu::VertexBufferLayout{
+                        array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
+                        step_mode: wgpu::VertexStepMode::Vertex,
+                        attributes: &wgpu::vertex_attr_array![0=> Float32x4,1=>Float32x2],
+                    },
+                ],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -225,6 +230,8 @@ impl Context{
             multiview: None,
         });
 
+        let camera = Camera::new(&device,Vec3::new(1.0,0.0,0.0),Vec3::new(0.0,0.0,0.0),Vec3::new(0.0,1.0,0.0),45.0,config.width as f32/config.height as f32,0.1,100.0);
+
         let compute_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor{
             label: Some("Compute Bind Group Layout"),
             entries: &[
@@ -241,6 +248,16 @@ impl Context{
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer{
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::COMPUTE,
                     ty: texture.binding_type(wgpu::StorageTextureAccess::WriteOnly),
                     count: None,
                 },
@@ -254,8 +271,12 @@ impl Context{
                     binding: 0,
                     resource: params.as_entire_binding(),
                 },
-                wgpu::BindGroupEntry {
+                wgpu::BindGroupEntry{
                     binding: 1,
+                    resource: camera.buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
                     resource: texture.binding_resource(),
                 },
             ],
@@ -275,6 +296,7 @@ impl Context{
 
         let imgui_layer = ImguiLayer::new(window.as_ref(), &config, &device, &queue).await;
 
+
         Self{
             device,
             queue,
@@ -291,6 +313,7 @@ impl Context{
             compute_bind_group_layout,
             texture,
             params,
+            camera,
         }
     }
 
@@ -315,6 +338,10 @@ impl Context{
                     },
                     wgpu::BindGroupEntry {
                         binding: 1,
+                        resource: self.camera.buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
                         resource: self.texture.binding_resource(),
                     },
                 ],
@@ -342,14 +369,28 @@ impl Context{
             // ]));
         }
     }
-    pub fn input(&mut self, _event: &WindowEvent) -> bool {
+
+    pub fn input(&mut self, event: &WindowEvent) -> bool {
         let io = self.imgui_layer.context.io();
         if io.want_capture_mouse || io.want_capture_keyboard {
             return false;
         } 
-        false
+        match event{
+            WindowEvent::KeyboardInput { 
+                input: 
+                    KeyboardInput{
+                        virtual_keycode: Some(key),
+                        state,
+                        ..
+                    }, 
+                ..
+            } => self.camera.process_keyboard(*key, *state),
+            _ => false,
+        }
     }
     pub fn update(&mut self){
+        self.camera.update_uniform();
+        self.queue.write_buffer(&self.camera.buffer, 0, bytemuck::cast_slice(&[self.camera.uniform]));
     }
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError>{
         let output = self.surface.get_current_texture()?;
@@ -395,12 +436,16 @@ impl Context{
 
             let ui = self.imgui_layer.context.frame();
             {
-                ui.window("Hello world")
-                    .size([150.0, 50.0], imgui::Condition::FirstUseEver)
+                ui.window("Camera Info")
+                    .size([200.0, 100.0], imgui::Condition::FirstUseEver)
                     .build(|| {
                         ui.text(format!(
-                            "Params: ({:.1},{:.1})",
-                            self.config.width, self.config.height
+                            "Position: ({})",
+                            self.camera.origin
+                        ));
+                        ui.text(format!(
+                            "Rotation: ({})",
+                            self.camera.look_at
                         ));
                     });
             }

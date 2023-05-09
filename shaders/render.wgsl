@@ -28,7 +28,9 @@ var texture: texture_storage_2d<rgba32float,read_write>;
 
 @fragment
 fn frag(i: VertexOutput) -> @location(0) vec4<f32>{
-    var coord: vec2<i32> = vec2<i32>(i32(i.tex_coord.x * f32(params.width)),i32(i.tex_coord.y * f32(params.height)));
-    var color: vec4<f32> = textureLoad(texture, coord);
-    return color;
+    var color = textureLoad(texture, vec2<i32>(
+        i32(i.tex_coord.x * f32(params.width)),
+        i32(i.tex_coord.y * f32(params.height))
+    ));
+    return vec4<f32>(pow(color.rgb, vec3<f32>(2.2)),color.a);
 }
