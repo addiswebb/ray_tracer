@@ -17,4 +17,3 @@ imgui-winit-support = "0.10.0"
 tokio = {version = "1.27.0", features = ["full"]}
 anyhow = "1.0.70"
 bytemuck = {version = "1.13.1", features = ["derive"]}
-

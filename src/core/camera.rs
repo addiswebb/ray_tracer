@@ -1,4 +1,4 @@
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 use imgui_winit_support::winit::event::{VirtualKeyCode, ElementState};
 use wgpu::util::DeviceExt;
 const SAFE_FRAC_PI_2: f32 = std::f32::consts::FRAC_PI_2 - 0.0001;
@@ -7,14 +7,33 @@ const SAFE_FRAC_PI_2: f32 = std::f32::consts::FRAC_PI_2 - 0.0001;
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
 pub struct CameraUniform{
     pub origin: [f32;3],
-    _padding1: [f32;2],
+    _padding1: f32,
     pub lower_left_corner:[f32;3],
-    _padding2: [f32;2],
+    _padding2: f32,
     pub horizontal: [f32;3],
-    _padding3: [f32;2],
+    _padding3: f32,
     pub vertical: [f32;3],
+    _padding4: f32,
     pub near: f32,
     pub far: f32,
+    _padding5: [f32;2]
+}
+impl CameraUniform{
+    pub fn new(origin: Vec3, lower_left_corner: Vec3, horizontal: Vec3, vertical: Vec3, near: f32, far: f32) -> Self{
+        Self {
+            origin: origin.to_array(),
+            _padding1: 0.0,
+            lower_left_corner: lower_left_corner.to_array(),
+            _padding2: 0.0,
+            horizontal: horizontal.to_array(),
+            _padding3: 0.0,
+            vertical: vertical.to_array(),
+            _padding4: 0.0,
+            near, 
+            far,
+            _padding5: [0.0;2],
+        }
+    }
 }
 
 pub struct Camera{
@@ -57,57 +76,50 @@ impl Camera{
         let w = (self.origin- self.look_at).normalize();
         let u = self.view_up.cross(w).normalize();
         let v = w.cross(u);
-        self.uniform = CameraUniform {
-            origin: self.origin.into(),
-            _padding1: [0.0;2],
-            lower_left_corner: (self.origin - half_width * u - half_height * v - self.near * w).into(),
-            _padding2: [0.0;2],
-            horizontal: (2.0 * half_width * u).into(),
-            _padding3: [0.0;2],
-            vertical: (2.0 * half_height * v).into(),
-            near: self.near, 
-            far: self.far,
-        };
+        let horizontal = 2.0 * half_width * u;
+        let vertical = 2.0 * half_height * v;
+        let lower_left_corner = self.origin - half_width * u - half_height * v - self.near * w;
+        self.uniform = CameraUniform::new(self.origin, lower_left_corner, horizontal,vertical, self.near, self.far);
     } 
     pub fn process_keyboard(&mut self, key: VirtualKeyCode, state: ElementState ) -> bool{
         let amount = if state == ElementState::Pressed {1.0} else {0.0};
 
         match key {
             VirtualKeyCode::W | VirtualKeyCode::Up=>{
-                self.origin.y += amount;
+                self.look_at.y += amount;
                 true
             }
             VirtualKeyCode::S | VirtualKeyCode::Down =>{
-                self.origin.y -= amount;
+                self.look_at.y -= amount;
                 true
             }
             VirtualKeyCode::A | VirtualKeyCode::Left =>{
-                self.origin.x -= amount;
+                self.look_at.x -= amount;
                 true
             }
             VirtualKeyCode::D | VirtualKeyCode::Right =>{
-                self.origin.x += amount;
+                self.look_at.x += amount;
                 true
             }
             VirtualKeyCode::Space => {
-                self.origin.z += amount;
+                self.look_at.z += amount;
                 true
             }
             VirtualKeyCode::LShift => {
-                self.origin.z -= amount;
+                self.look_at.z -= amount;
                 true
             }
             _ => false
         }
     }
     pub fn process_mouse(&mut self, mouse_dx: f64, mouse_dy: f64){
-        self.look_at.x += degrees(mouse_dx as f32)/10.0;
-        self.look_at.y += degrees(mouse_dy as f32)/10.0;
+        self.origin.x += degrees(mouse_dx as f32)/10.0;
+        self.origin.y += degrees(mouse_dy as f32)/10.0;
 
-        if self.look_at.y< -degrees(SAFE_FRAC_PI_2) {
-            self.look_at.y = -degrees(SAFE_FRAC_PI_2);
-        } else if self.look_at.y > degrees(SAFE_FRAC_PI_2) {
-            self.look_at.y = degrees(SAFE_FRAC_PI_2);
+        if self.origin.y< -degrees(SAFE_FRAC_PI_2) {
+            self.origin.y = -degrees(SAFE_FRAC_PI_2);
+        } else if self.origin.y > degrees(SAFE_FRAC_PI_2) {
+            self.origin.y = degrees(SAFE_FRAC_PI_2);
         }
     }
 }

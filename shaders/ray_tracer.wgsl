@@ -64,18 +64,11 @@ fn ray_sphere(ray: Ray, pos: vec3<f32>, radius: f32) -> Hit{
     return hit;
 }
 
-
 fn frag(i: FragInput) -> vec4<f32>{
     let pos = i.pos / i.size;
     var ray: Ray;
     ray.origin = camera.origin;
     ray.dir = normalize(camera.lower_left_corner + pos.x * camera.horizontal + pos.y * camera.vertical - ray.origin);
-    let hit = ray_sphere(ray, vec3<f32>(0.0,0.0,0.0), 0.8);
-    var color = vec4<f32>(0.0,0.0,0.0,0.0);
-    if hit.hit {
-        color = vec4<f32>(1.0,1.0,1.0,0.0);
-    }
-    let x = dot(hit.normal, vec3<f32>(1.0,0.0,0.0));
-    return color;
-
+    var hit = ray_sphere(ray, vec3<f32>(0.0,0.0,0.0), 0.1);
+    return vec4<f32>(hit.normal, 0.0);
 }
