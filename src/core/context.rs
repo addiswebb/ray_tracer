@@ -1,7 +1,7 @@
-use std::mem;
+use std::{mem, num::NonZeroU32};
 
 use bytemuck::{Pod, Zeroable};
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 use imgui_winit_support::winit::{self, event::{WindowEvent, KeyboardInput}};
 use wgpu::util::DeviceExt;
 
@@ -23,6 +23,38 @@ struct Params {
     height : u32,
 }
 
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
+struct Sphere{
+    position: [f32;3], 
+    radius: f32,
+    material: Material,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
+struct Material{
+    color: [f32;4],
+    emission_color: [f32;4],
+    emission_strength: f32,
+}
+
+impl Sphere{
+    pub fn new(position: Vec3, radius: f32, color: Vec4, emission_color: Vec4, emission_strength: f32) -> Self{
+        Self { 
+            position: position.to_array(),
+            radius,
+            material: Material{
+                color: color.to_array(),
+                emission_color: emission_color.to_array(),
+                emission_strength
+            }
+        }
+    }
+}
+
+
 pub struct Context{
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
@@ -40,6 +72,7 @@ pub struct Context{
     pub texture: Texture,
     pub params: wgpu::Buffer,
     pub camera: Camera,
+    pub scene_buffer: wgpu::Buffer,
 }
 
 impl Context{
@@ -230,11 +263,63 @@ impl Context{
             multiview: None,
         });
 
-        let camera = Camera::new(&device,Vec3::new(1.0,0.0,0.0),Vec3::new(0.0,0.0,0.0),Vec3::new(0.0,1.0,0.0),45.0,config.width as f32/config.height as f32,0.1,100.0);
+/*         let camera = Camera::new(&device,Vec3::new(1.0,0.0,0.0),Vec3::new(0.0,0.0,0.0),Vec3::new(0.0,1.0,0.0),45.0,config.width as f32/config.height as f32,0.1,100.0); */
+        let camera = Camera::new(&device,Vec3::new(-5.0,-10.0,0.0),Vec3::new(-2.0,-3.0,0.0),Vec3::new(0.0,1.0,0.0),45.0,config.width as f32/config.height as f32,0.1,100.0);
+/*         let camera = Camera::new(&device,Vec3::new(3.089,1.53,-3.0),Vec3::new(-2.0,-1.0,2.0),Vec3::new(0.0,1.0,0.0),45.0,config.width as f32/config.height as f32,0.1,100.0); */
+
+        /* let scene = [
+            Sphere::new(
+                Vec3::new(-2.54,-0.72,0.5),0.6, 
+                Vec4::new(1.0,0.0,0.0,1.0),
+                Vec4::new(0.0,0.0,0.0,1.0),0.0,
+            ),
+            Sphere::new(
+                Vec3::new(-1.27,-0.72,1.0),0.5, 
+                Vec4::new(0.0,1.0,0.0,1.0),
+                Vec4::new(0.0,0.0,0.0,1.0), 0.0,
+            ),
+            Sphere::new(
+                Vec3::new(-0.5,-0.9,1.55),0.35,
+                Vec4::new(0.0,0.0,1.0,1.0),
+                Vec4::new(0.0,0.0,0.0,1.0), 0.0,
+            ),
+            /*  floor*/
+            Sphere::new(
+                Vec3::new(-3.46,-15.88,2.76),15.0,
+                Vec4::new(0.5,0.0,0.8,1.0),
+                Vec4::new(1.0,1.0,1.0,1.0), 0.0,
+            ),
+            /*  Light Object       */
+            Sphere::new(
+                Vec3::new(-7.44,-0.72,20.0),15.0,
+                Vec4::new(1.0,1.0,1.0,1.0),
+                Vec4::new(1.0,1.0,1.0,1.0), 1.0,
+            )
+        ]; */
+
+        let scene = [
+            Sphere::new(
+                Vec3::new(0.0,0.0,0.0),0.3,
+                Vec4::new(0.5,0.0,0.0,1.0),
+                Vec4::new(1.0,1.0,1.0,1.0), 1.0,
+            ),
+            Sphere::new(
+                Vec3::new(0.0,0.0,0.0),2.3,
+                Vec4::new(0.5,0.5,0.5,1.0),
+                Vec4::new(0.5,0.5,0.5,1.0), 1.0,
+            )
+        ];
+
+        let scene_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
+            label: Some("Scene Buffer"),
+            contents: bytemuck::bytes_of(&scene),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST| wgpu::BufferUsages::STORAGE,
+        }); 
 
         let compute_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor{
             label: Some("Compute Bind Group Layout"),
             entries: &[
+                //Params
                 wgpu::BindGroupLayoutEntry{
                     binding: 0,
                     visibility: wgpu::ShaderStages::COMPUTE,
@@ -245,6 +330,7 @@ impl Context{
                     },
                     count: None,
                 },
+                //Camera
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStages::COMPUTE,
@@ -255,10 +341,22 @@ impl Context{
                     },
                     count: None,
                 },
+                //Texture
                 wgpu::BindGroupLayoutEntry {
                     binding: 2,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: texture.binding_type(wgpu::StorageTextureAccess::WriteOnly),
+                    count: None,
+                },
+                //Scene
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer{
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: wgpu::BufferSize::new((mem::size_of::<Sphere>() * scene.len()) as _),
+                    },
                     count: None,
                 },
             ],
@@ -278,6 +376,10 @@ impl Context{
                 wgpu::BindGroupEntry {
                     binding: 2,
                     resource: texture.binding_resource(),
+                },
+                wgpu::BindGroupEntry{
+                    binding: 3,
+                    resource: scene_buffer.as_entire_binding(),
                 },
             ],
         });
@@ -314,6 +416,7 @@ impl Context{
             texture,
             params,
             camera,
+            scene_buffer,
         }
     }
 
@@ -344,6 +447,10 @@ impl Context{
                         binding: 2,
                         resource: self.texture.binding_resource(),
                     },
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: self.scene_buffer.as_entire_binding(),
+                    },
                 ],
             });
 
@@ -361,12 +468,6 @@ impl Context{
                 ],
                 label: Some("Bind Group"),
             });
-            // self.queue.write_buffer(&self.params, 0, bytemuck::cast_slice(&[
-            //     Params{
-            //         width:size.width,
-            //         height:size.height
-            //     }
-            // ]));
         }
     }
 
@@ -426,7 +527,6 @@ impl Context{
                 })],
                 depth_stencil_attachment: None,
             });
-
             
             render_pass.set_pipeline(&self.pipeline);
             render_pass.set_bind_group(0, &self.bind_group,&[]);
