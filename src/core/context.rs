@@ -2,7 +2,7 @@ use std::{mem, num::NonZeroU32};
 
 use bytemuck::{Pod, Zeroable};
 use glam::{Vec3, Vec4};
-use imgui_winit_support::winit::{self, event::{WindowEvent, KeyboardInput}};
+use imgui_winit_support::winit::{self, event::{WindowEvent, KeyboardInput, ElementState, MouseButton}};
 use wgpu::util::DeviceExt;
 
 use super::{window::Window, imgui::ImguiLayer, texture::Texture, camera::{Camera, CameraUniform}};
@@ -73,6 +73,7 @@ pub struct Context{
     pub params: wgpu::Buffer,
     pub camera: Camera,
     pub scene_buffer: wgpu::Buffer,
+    pub mouse_pressed: bool,
 }
 
 impl Context{
@@ -417,6 +418,7 @@ impl Context{
             params,
             camera,
             scene_buffer,
+            mouse_pressed: false,
         }
     }
 
@@ -486,6 +488,14 @@ impl Context{
                     }, 
                 ..
             } => self.camera.process_keyboard(*key, *state),
+            WindowEvent::MouseInput { 
+                button: MouseButton::Left, 
+                state,
+                ..
+            } => {
+                self.mouse_pressed = *state == ElementState::Pressed;
+                true
+            }
             _ => false,
         }
     }

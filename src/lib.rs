@@ -19,7 +19,7 @@ pub async fn run(){
     log::info!("Starting event_loop");
     window.event_loop.run(move |event, _, control_flow| {
         match event{
-            Event::DeviceEvent { event: DeviceEvent::MouseMotion{delta,}, ..  } => {
+            Event::DeviceEvent { event: DeviceEvent::MouseMotion{delta,}, ..  } => if context.mouse_pressed{
                 context.camera.process_mouse(delta.0, delta.1)
             }
             Event::MainEventsCleared => window.raw.request_redraw(),

@@ -1,5 +1,5 @@
 use glam::{Vec3, Vec4};
-use imgui_winit_support::winit::event::{VirtualKeyCode, ElementState};
+use imgui_winit_support::winit::{event::{VirtualKeyCode, ElementState, MouseScrollDelta}, dpi::PhysicalPosition};
 use wgpu::util::DeviceExt;
 const SAFE_FRAC_PI_2: f32 = std::f32::consts::FRAC_PI_2 - 0.0001;
 
@@ -83,47 +83,54 @@ impl Camera{
     } 
     pub fn process_keyboard(&mut self, key: VirtualKeyCode, state: ElementState ) -> bool{
         let amount = if state == ElementState::Pressed {1.0} else {0.0};
+        let mut delta = Vec3::ZERO;
 
-        match key {
+        let processed = match key {
             VirtualKeyCode::W | VirtualKeyCode::Up=>{
-                self.look_at.y += amount;
+                delta.y += amount;
                 true
             }
             VirtualKeyCode::S | VirtualKeyCode::Down =>{
-                self.look_at.y -= amount;
+                delta.y -= amount;
                 true
             }
             VirtualKeyCode::A | VirtualKeyCode::Left =>{
-                self.look_at.x -= amount;
+                delta.x -= amount;
                 true
             }
             VirtualKeyCode::D | VirtualKeyCode::Right =>{
-                self.look_at.x += amount;
+                delta.x += amount;
                 true
             }
             VirtualKeyCode::Space => {
-                self.look_at.z += amount;
+                delta.z += amount;
                 true
             }
             VirtualKeyCode::LShift => {
-                self.look_at.z -= amount;
+                delta.z -= amount;
                 true
             }
             _ => false
-        }
+        };
+        self.look_at += delta;
+        self.origin += delta;
+        return processed;
     }
     pub fn process_mouse(&mut self, mouse_dx: f64, mouse_dy: f64){
-        self.origin.x += degrees(mouse_dx as f32)/10.0;
-        self.origin.y += degrees(mouse_dy as f32)/10.0;
+        self.look_at.x += degrees(mouse_dx as f32)/30.0;
+        self.look_at.y += degrees(mouse_dy as f32)/30.0;
 
-        if self.origin.y< -degrees(SAFE_FRAC_PI_2) {
-            self.origin.y = -degrees(SAFE_FRAC_PI_2);
-        } else if self.origin.y > degrees(SAFE_FRAC_PI_2) {
-            self.origin.y = degrees(SAFE_FRAC_PI_2);
+        if self.look_at.y< -degrees(SAFE_FRAC_PI_2) {
+            self.look_at.y = -degrees(SAFE_FRAC_PI_2);
+        } else if self.look_at.y > degrees(SAFE_FRAC_PI_2) {
+            self.look_at.y = degrees(SAFE_FRAC_PI_2);
         }
     }
 }
 
+pub fn radians(deg: f32)->f32{
+    deg * (std::f32::consts::PI / 180.0)
+}
 pub fn degrees(rad: f32) -> f32{
     rad * (180.0/std::f32::consts::PI)
 }
