@@ -41,7 +41,7 @@ impl Camera{
             contents: bytemuck::bytes_of(&uniform),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
-        let controller = CameraController::new(0.001,0.0001);
+        let controller = CameraController::new(0.01,0.0001);
 
         let direction = (look_at - origin).normalize();
         let pitch = degrees(direction.y.asin());
@@ -99,7 +99,7 @@ impl Camera{
         // to get closer to an object you want to focus on.
         let (pitch_sin, pitch_cos) = radians(self.pitch).sin_cos();
         let scrollward = Vec3::new(pitch_cos * yaw_cos, pitch_sin, pitch_cos * yaw_sin).normalize();
-        self.origin-= scrollward * self.controller.scroll * self.controller.speed * self.controller.sensitivity;
+        self.origin -= scrollward * self.controller.scroll * self.controller.speed * self.controller.sensitivity;
         self.controller.scroll = 0.0;
 
         // Move up/down. Since we don't use roll, we can just
@@ -189,13 +189,13 @@ impl CameraController{
         }
     }
     pub fn process_mouse(&mut self, mouse_dx: f64, mouse_dy: f64){
-        self.rotate_horizontal = mouse_dx as f32 * 3.0;
+        self.rotate_horizontal = mouse_dx as f32 * -3.0;
         self.rotate_vertical = mouse_dy as f32 * 3.0;
     }
 
     pub fn process_scroll(&mut self, delta: &MouseScrollDelta){
         self.scroll = -match delta{
-            MouseScrollDelta::LineDelta(_, scroll) => scroll * 100.0,
+            MouseScrollDelta::LineDelta(_, scroll) => scroll * 10000.0,
             MouseScrollDelta::PixelDelta(PhysicalPosition{
                 y: scroll,
                 ..

@@ -95,9 +95,9 @@ impl Context{
 
         let vertex_data = [
             Context::vertex([-1,-1], [0, 0]),
-            Context::vertex([ 1,-1], [0, 1]),
+            Context::vertex([ 1,-1], [1, 0]),
             Context::vertex([ 1, 1], [1, 1]),
-            Context::vertex([-1, 1], [1, 0]),
+            Context::vertex([-1, 1], [0, 1]),
         ];
 
         let index_data: &[u16] = &[
@@ -273,9 +273,9 @@ impl Context{
             multiview: None,
         });
 
-        let camera = Camera::new(&device,Vec3::new(1.0,0.0,0.0),Vec3::new(0.0,0.0,0.0),Vec3::new(0.0,1.0,0.0),45.0,config.width as f32/config.height as f32,0.1,100.0);
+/*         let camera = Camera::new(&device,Vec3::new(1.0,0.0,0.0),Vec3::new(0.0,0.0,0.0),Vec3::new(0.0,1.0,0.0),45.0,config.width as f32/config.height as f32,0.1,100.0); */
 /*         let camera = Camera::new(&device,Vec3::new(-5.0,-10.0,0.0),Vec3::new(-2.0,-3.0,0.0),Vec3::new(0.0,1.0,0.0),45.0,config.width as f32/config.height as f32,0.1,100.0); */
-/*         let camera = Camera::new(&device,Vec3::new(3.0,1.5,-3.0),Vec3::new(20.0,-45.0,0.0),Vec3::new(0.0,1.0,0.0),28.0,config.width as f32/config.height as f32,0.1,100.0); */
+        let camera = Camera::new(&device,Vec3::new(3.0,1.5,-3.0),Vec3::new(20.0,-45.0,0.0),Vec3::new(0.0,1.0,0.0),28.0,config.width as f32/config.height as f32,0.1,100.0);
         println!("{} {}",camera.pitch, camera.yaw);
 
         let scene = [
@@ -305,14 +305,6 @@ impl Context{
                 Vec3::new(-7.44,-0.72,20.0),15.0,
                 Vec4::new(1.0,1.0,1.0,1.0),
                 Vec4::new(1.0,1.0,1.0,1.0), 1.0,
-            )
-        ];
-
-        let scene = [
-            Sphere::new(
-                Vec3::new(0.0,0.0,0.0),0.1,
-                Vec4::new(1.0,1.0,1.0,1.0),
-                Vec4::new(1.0,1.0,1.0,1.0),1.0
             )
         ];
 

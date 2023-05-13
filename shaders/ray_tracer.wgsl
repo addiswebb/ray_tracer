@@ -127,7 +127,7 @@ fn trace(ray: Ray, rng_state: f32) -> vec4<f32>{
     var ray: Ray = ray;
     var incoming_light = vec4<f32>(0.0);
     var ray_color = vec4<f32>(1.0);
-    for (var i = 0; i <= 10; i +=1){
+    for (var i = 0; i <= 1; i +=1){
         var hit: Hit = calculate_ray_collions(ray);
         if (hit.hit){
             ray.origin = hit.hit_point;
