@@ -1,11 +1,11 @@
-use std::{mem, num::NonZeroU32};
+use std::{mem};
 
 use bytemuck::{Pod, Zeroable};
 use glam::{Vec3, Vec4};
 use imgui_winit_support::winit::{self, event::{WindowEvent, KeyboardInput, ElementState, MouseButton}};
 use wgpu::util::DeviceExt;
 
-use super::{window::Window, imgui::ImguiLayer, texture::Texture, camera::{Camera, CameraUniform}};
+use super::{window::Window, imgui::ImguiLayer, texture::Texture, camera::{Camera, }};
 
 const WORKGROUP_SIZE: (u32, u32) = (8, 8);
 
@@ -29,7 +29,10 @@ struct Params {
 struct Sphere{
     position: [f32;3], 
     radius: f32,
-    material: Material,
+    color: [f32;4],
+    emission_color: [f32;4],
+    emission_strength: f32,
+    _padding: [f32;3],
 }
 
 #[repr(C)]
@@ -45,11 +48,10 @@ impl Sphere{
         Self { 
             position: position.to_array(),
             radius,
-            material: Material{
-                color: color.to_array(),
-                emission_color: emission_color.to_array(),
-                emission_strength
-            }
+            color: color.to_array(),
+            emission_color: emission_color.to_array(),
+            emission_strength,
+            _padding: [123.0;3],
         }
     }
 }
@@ -84,11 +86,18 @@ impl Context{
         }
     }
     fn create_vertices() -> (Vec<Vertex>, Vec<u16>) {
-        let vertex_data = [
+/*         let vertex_data = [
             Context::vertex([-1,-1], [0, 0]),
             Context::vertex([ 1,-1], [1, 0]),
             Context::vertex([ 1, 1], [1, 1]),
             Context::vertex([-1, 1], [0, 1]),
+        ]; */
+
+        let vertex_data = [
+            Context::vertex([-1,-1], [0, 0]),
+            Context::vertex([ 1,-1], [0, 1]),
+            Context::vertex([ 1, 1], [1, 1]),
+            Context::vertex([-1, 1], [1, 0]),
         ];
 
         let index_data: &[u16] = &[
@@ -264,11 +273,12 @@ impl Context{
             multiview: None,
         });
 
-/*         let camera = Camera::new(&device,Vec3::new(1.0,0.0,0.0),Vec3::new(0.0,0.0,0.0),Vec3::new(0.0,1.0,0.0),45.0,config.width as f32/config.height as f32,0.1,100.0); */
-        let camera = Camera::new(&device,Vec3::new(-5.0,-10.0,0.0),Vec3::new(-2.0,-3.0,0.0),Vec3::new(0.0,1.0,0.0),45.0,config.width as f32/config.height as f32,0.1,100.0);
-/*         let camera = Camera::new(&device,Vec3::new(3.089,1.53,-3.0),Vec3::new(-2.0,-1.0,2.0),Vec3::new(0.0,1.0,0.0),45.0,config.width as f32/config.height as f32,0.1,100.0); */
+        let camera = Camera::new(&device,Vec3::new(1.0,0.0,0.0),Vec3::new(0.0,0.0,0.0),Vec3::new(0.0,1.0,0.0),45.0,config.width as f32/config.height as f32,0.1,100.0);
+/*         let camera = Camera::new(&device,Vec3::new(-5.0,-10.0,0.0),Vec3::new(-2.0,-3.0,0.0),Vec3::new(0.0,1.0,0.0),45.0,config.width as f32/config.height as f32,0.1,100.0); */
+/*         let camera = Camera::new(&device,Vec3::new(3.0,1.5,-3.0),Vec3::new(20.0,-45.0,0.0),Vec3::new(0.0,1.0,0.0),28.0,config.width as f32/config.height as f32,0.1,100.0); */
+        println!("{} {}",camera.pitch, camera.yaw);
 
-        /* let scene = [
+        let scene = [
             Sphere::new(
                 Vec3::new(-2.54,-0.72,0.5),0.6, 
                 Vec4::new(1.0,0.0,0.0,1.0),
@@ -296,18 +306,13 @@ impl Context{
                 Vec4::new(1.0,1.0,1.0,1.0),
                 Vec4::new(1.0,1.0,1.0,1.0), 1.0,
             )
-        ]; */
+        ];
 
         let scene = [
             Sphere::new(
-                Vec3::new(0.0,0.0,0.0),0.3,
-                Vec4::new(0.5,0.0,0.0,1.0),
-                Vec4::new(1.0,1.0,1.0,1.0), 1.0,
-            ),
-            Sphere::new(
-                Vec3::new(0.0,0.0,0.0),2.3,
-                Vec4::new(0.5,0.5,0.5,1.0),
-                Vec4::new(0.5,0.5,0.5,1.0), 1.0,
+                Vec3::new(0.0,0.0,0.0),0.1,
+                Vec4::new(1.0,1.0,1.0,1.0),
+                Vec4::new(1.0,1.0,1.0,1.0),1.0
             )
         ];
 
@@ -487,7 +492,11 @@ impl Context{
                         ..
                     }, 
                 ..
-            } => self.camera.process_keyboard(*key, *state),
+            } => self.camera.controller.process_keyboard(*key, *state),
+            WindowEvent::MouseWheel { delta, .. } => {
+                self.camera.controller.process_scroll(delta);
+                true
+            }
             WindowEvent::MouseInput { 
                 button: MouseButton::Left, 
                 state,
@@ -500,8 +509,9 @@ impl Context{
         }
     }
     pub fn update(&mut self){
-        self.camera.update_uniform();
-        self.queue.write_buffer(&self.camera.buffer, 0, bytemuck::cast_slice(&[self.camera.uniform]));
+        self.camera.update_camera();
+        let uniform = self.camera.to_uniform();
+        self.queue.write_buffer(&self.camera.buffer, 0, bytemuck::cast_slice(&[uniform]));
     }
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError>{
         let output = self.surface.get_current_texture()?;
@@ -554,8 +564,16 @@ impl Context{
                             self.camera.origin
                         ));
                         ui.text(format!(
-                            "Rotation: ({})",
+                            "Look At: ({})",
                             self.camera.look_at
+                        ));
+                        ui.text(format!(
+                            "pitch: ({})",
+                            self.camera.pitch
+                        ));
+                        ui.text(format!(
+                            "yaw: ({})",
+                            self.camera.yaw
                         ));
                     });
             }
