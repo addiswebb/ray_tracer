@@ -1,7 +1,8 @@
-use glam::{Vec3, Vec4, Mat4};
+use glam::{Vec3};
 use imgui_winit_support::winit::{event::{VirtualKeyCode, ElementState, MouseScrollDelta}, dpi::PhysicalPosition};
 use wgpu::util::DeviceExt;
 const SAFE_FRAC_PI_2: f32 = std::f32::consts::FRAC_PI_2 - 0.0001;
+const SAFE_FRAC_PI_2_DEG: f32 = SAFE_FRAC_PI_2 * (180.0/std::f32::consts::PI);
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
@@ -41,11 +42,11 @@ impl Camera{
             contents: bytemuck::bytes_of(&uniform),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
-        let controller = CameraController::new(0.01,0.0001);
+        let controller = CameraController::new(0.01,0.002);
 
-        let direction = (look_at - origin).normalize();
-        let pitch = degrees(direction.y.asin());
-        let yaw = degrees((direction.x).atan2(direction.z));
+
+        let pitch = 0.0;
+        let yaw = 0.0;
 
         Camera{
             origin,
@@ -86,10 +87,14 @@ impl Camera{
         }
     }
     pub fn update_camera(&mut self) {
+        let direction = (self.look_at - self.origin).normalize();
+        let mut pitch = direction.y.asin();
+        let mut yaw = direction.x.atan2(direction.z);
+
         // Move forward/backward and left/right
-        let (yaw_sin, yaw_cos) = radians(self.yaw).sin_cos();
-        let forward = Vec3::new(yaw_cos, 0.0, yaw_sin).normalize();
-        let right = Vec3::new(-yaw_sin, 0.0, yaw_cos).normalize();
+        let (yaw_sin, yaw_cos) = yaw.sin_cos();
+        let forward = Vec3::new(yaw_sin, 0.0, yaw_cos).normalize();
+        let right = Vec3::new(yaw_cos, 0.0, -yaw_sin).normalize();
         self.origin += forward * (self.controller.amount_forward - self.controller.amount_backward) * self.controller.speed;
         self.origin += right * (self.controller.amount_right - self.controller.amount_left) * self.controller.speed;
 
@@ -97,7 +102,7 @@ impl Camera{
         // Note: this isn't an actual zoom. The camera's position
         // changes when zooming. I've added this to make it easier
         // to get closer to an object you want to focus on.
-        let (pitch_sin, pitch_cos) = radians(self.pitch).sin_cos();
+        let (pitch_sin, pitch_cos) = pitch.sin_cos();
         let scrollward = Vec3::new(pitch_cos * yaw_cos, pitch_sin, pitch_cos * yaw_sin).normalize();
         self.origin -= scrollward * self.controller.scroll * self.controller.speed * self.controller.sensitivity;
         self.controller.scroll = 0.0;
@@ -107,8 +112,8 @@ impl Camera{
         self.origin.y += (self.controller.amount_up - self.controller.amount_down) * self.controller.speed;
 
         // Rotate
-        self.yaw += degrees(self.controller.rotate_horizontal) * self.controller.sensitivity;
-        self.pitch += degrees(-self.controller.rotate_vertical) * self.controller.sensitivity;
+        yaw += self.controller.rotate_horizontal * self.controller.sensitivity;
+        pitch += -self.controller.rotate_vertical * self.controller.sensitivity;
 
         // If process_mouse isn't called every frame, these values
         // will not get set to zero, and the camera will rotate
@@ -117,12 +122,12 @@ impl Camera{
         self.controller.rotate_vertical = 0.0;
 
         // Keep the camera's angle from going too high/low.
-        if self.pitch < -degrees(SAFE_FRAC_PI_2) {
-            self.pitch = -degrees(SAFE_FRAC_PI_2);
-        } else if self.pitch > degrees(SAFE_FRAC_PI_2) {
-            self.pitch = degrees(SAFE_FRAC_PI_2);
+        if pitch < -SAFE_FRAC_PI_2_DEG {
+            pitch = -SAFE_FRAC_PI_2_DEG;
+        } else if pitch > SAFE_FRAC_PI_2_DEG {
+            pitch = SAFE_FRAC_PI_2_DEG;
         }
-        self.look_at = self.origin + Vec3::new(self.pitch.cos() * self.yaw.sin(), self.pitch.sin(), self.pitch.cos() * self.yaw.cos());
+        self.look_at = self.origin + Vec3::new(pitch.cos() * yaw.sin(), pitch.sin(), pitch.cos() * yaw.cos());
     }
 }
 #[derive(Debug)]
@@ -189,7 +194,7 @@ impl CameraController{
         }
     }
     pub fn process_mouse(&mut self, mouse_dx: f64, mouse_dy: f64){
-        self.rotate_horizontal = mouse_dx as f32 * -3.0;
+        self.rotate_horizontal = mouse_dx as f32 * 3.0;
         self.rotate_vertical = mouse_dy as f32 * 3.0;
     }
 
