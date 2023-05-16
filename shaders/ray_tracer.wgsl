@@ -113,13 +113,36 @@ fn rand_distribution(state: f32) -> f32{
 
 fn rand_dir(state: f32) -> vec3<f32>{
     let x = rand_distribution(state);
-    let y = rand_distribution(state);
-    let z = rand_distribution(state);
+    let y = rand_distribution(state * 2.0);
+    let z = rand_distribution(state * 3.0);
     return normalize(vec3<f32>(x,y,z));
 }
+fn rand_unit_sphere(state: f32) -> vec3<f32>{
+    for (var i = 0; i <= 100; i+=1){
+        let p = 2.0 * vec3<f32>(rand(state),rand(state * 2.0),rand(state * 3.0)) - 1.0;
+        let sqr = pow(p, vec3<f32>(2.0));
+        let length_sqr = sqr.x + sqr.y + sqr.z;
+        if(sqrt(length_sqr) < 1.0){
+            return p;
+        }
+    }
+    return vec3<f32>(0.0);
+}
+fn rand_hemisphere_dir(state: f32) -> vec3<f32>{
+    for (var i = 0; i <= 100; i+=1){
+        let p = rand_dir(state);
+        let sqr = pow(p, vec3<f32>(2.0));
+        let length_sqr = sqr.x + sqr.y + sqr.z;
+        if (sqrt(length_sqr) < 1.0){
+            return normalize(p);
+        }
+    }
+    return vec3<f32>(1.0,1.0,1.0);
+}
 
-fn rand_hemisphere_dir(normal: vec3<f32>, state: f32) -> vec3<f32>{
-    let dir = rand_dir(state);
+
+fn rand_hemisphere_dir_dist(normal: vec3<f32>, state: f32) -> vec3<f32>{
+    let dir = rand_unit_sphere(state);
     return dir * sign(dot(normal, dir));
 }
 
@@ -127,11 +150,13 @@ fn trace(ray: Ray, rng_state: f32) -> vec4<f32>{
     var ray: Ray = ray;
     var ray_color = vec4<f32>(1.0);
     var incoming_light = vec4<f32>(0.0);
+    var normal = vec3<f32>(0.0);
     for (var i = 0; i <= 2; i +=1){
-        var hit: Hit = calculate_ray_collions(ray);
+        var hit = calculate_ray_collions(ray);
         if (hit.hit){
             ray.origin = hit.hit_point;
-            ray.dir = rand_hemisphere_dir(hit.normal, rng_state);
+            ray.dir = normalize(rand_hemisphere_dir_dist(hit.normal,rng_state));
+            normal = hit.normal;
             let emitted_light = hit.material.emission_color * hit.material.emission_strength;
             incoming_light += emitted_light * ray_color;
             ray_color *= hit.material.color;
