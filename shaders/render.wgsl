@@ -35,10 +35,6 @@ fn frag(i: VertexOutput) -> @location(0) vec4<f32>{
         i32(i.tex_coord.x * f32(params.width)),
         i32(i.tex_coord.y * f32(params.height))
     ));
-    if (params.toggle != 0){
-        return vec4<f32>(color.rgb,color.a);
-    }else{
-        return vec4<f32>(pow(color.rgb,vec3<f32>(2.2)),color.a);
-    }
-
+    // return vec4<f32>(pow(color.rgb,vec3<f32>(2.2)),color.a);
+    return color;
 }
