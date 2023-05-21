@@ -65,6 +65,10 @@ struct Hit{
     material: Material,
 }
 
+const HORIZON: vec4<f32> = vec4<f32>(1.0,1.0,1.0,0.0);
+const ZENITH: vec4<f32> = vec4<f32>(0.0788092, 0.36480793, 0.7264151, 0.0);
+const GROUND: vec4<f32> = vec4<f32>(0.35,0.3,0.35, 0.0);
+
 fn ray_sphere(ray: Ray, pos: vec3<f32>, radius: f32) -> Hit{
     var hit: Hit;
     let oc = ray.origin - pos;
@@ -168,22 +172,29 @@ fn trace(ray: Ray, seed: ptr<function, u32>) -> vec4<f32>{
     var ray: Ray = ray;
     var ray_color = vec4<f32>(1.0);
     var incoming_light = vec4<f32>(0.0);
-    var normal = vec3<f32>(0.0);
     for (var i = 0; i <= params.number_of_bounces; i +=1){
         var hit = calculate_ray_collions(ray);
         if (hit.hit){
             ray.origin = hit.hit_point;
-            //change rand state per thing otherwise bad bouncing
-            ray.dir = rand_hemisphere_dir_dist_2(hit.normal,seed);
-            normal = ray.dir;
+            ray.dir = rand_hemisphere_dir_dist_2(hit.normal, seed);
             let emitted_light = hit.material.emission_color * hit.material.emission_strength;
             incoming_light += emitted_light * ray_color;
             ray_color *= hit.material.color;
         }else{
+            incoming_light += get_environment_light(ray) * ray_color;
             break;
         }
     }
-    return ray_color;
+    return incoming_light;
+}
+
+fn get_environment_light(ray: Ray) -> vec4<f32>{
+    let sky_gradient_t = pow(smoothstep(0.0, 0.4, ray.dir.y), 0.35);
+    let ground_to_sky_t = smoothstep(-0.01, 0.0, ray.dir.y);
+    let sky_gradient = mix(HORIZON,ZENITH, sky_gradient_t);
+    let sun = pow(max(0.0, dot(ray.dir, vec3<f32>(0.1,1.0,0.1))),500.0) * 200.0;
+    let composite = mix(GROUND, sky_gradient,ground_to_sky_t) + sun * f32(ground_to_sky_t >=1.0);
+    return composite;
 }
 
 fn frag(i: FragInput) -> vec4<f32>{
