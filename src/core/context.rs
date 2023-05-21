@@ -429,6 +429,7 @@ impl Context{
         if size.width > 0 && size.height > 0{
             self.config.width = size.width;
             self.config.height = size.height;
+            self.camera.aspect = size.width as f32/ size.height as f32;
             self.surface.configure(&self.device, &self.config);
             self.texture = Texture::new(&self.device,size.width,size.height,wgpu::TextureFormat::Rgba32Float);
 

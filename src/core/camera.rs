@@ -90,7 +90,6 @@ impl Camera{
         let direction = (self.look_at - self.origin).normalize();
         let mut pitch = direction.y.asin();
         let mut yaw = direction.x.atan2(direction.z);
-
         // Move forward/backward and left/right
         let (yaw_sin, yaw_cos) = yaw.sin_cos();
         let forward = Vec3::new(yaw_sin, 0.0, yaw_cos).normalize();
