@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use glam::{Vec3};
 use imgui_winit_support::winit::{event::{VirtualKeyCode, ElementState, MouseScrollDelta}, dpi::PhysicalPosition};
 use wgpu::util::DeviceExt;
@@ -42,7 +44,7 @@ impl Camera{
             contents: bytemuck::bytes_of(&uniform),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
-        let controller = CameraController::new(0.01,0.002);
+        let controller = CameraController::new(3.0,0.35);
 
 
         let pitch = 0.0;
@@ -86,7 +88,9 @@ impl Camera{
             _padding5: [0.0;2],
         }
     }
-    pub fn update_camera(&mut self) {
+    pub fn update_camera(&mut self, dt: Duration) {
+        let dt = dt.as_secs_f32();
+
         let direction = (self.look_at - self.origin).normalize();
         let mut pitch = direction.y.asin();
         let mut yaw = direction.x.atan2(direction.z);
@@ -94,8 +98,8 @@ impl Camera{
         let (yaw_sin, yaw_cos) = yaw.sin_cos();
         let forward = Vec3::new(yaw_sin, 0.0, yaw_cos).normalize();
         let right = Vec3::new(yaw_cos, 0.0, -yaw_sin).normalize();
-        self.origin += forward * (self.controller.amount_forward - self.controller.amount_backward) * self.controller.speed;
-        self.origin += right * (self.controller.amount_right - self.controller.amount_left) * self.controller.speed;
+        self.origin += forward * (self.controller.amount_forward - self.controller.amount_backward) * self.controller.speed * dt;
+        self.origin += right * (self.controller.amount_right - self.controller.amount_left) * self.controller.speed * dt;
 
         // Move in/out (aka. "zoom")
         // Note: this isn't an actual zoom. The camera's position
@@ -103,16 +107,16 @@ impl Camera{
         // to get closer to an object you want to focus on.
         let (pitch_sin, pitch_cos) = pitch.sin_cos();
         let scrollward = Vec3::new(pitch_cos * yaw_cos, pitch_sin, pitch_cos * yaw_sin).normalize();
-        self.origin -= scrollward * self.controller.scroll * self.controller.speed * self.controller.sensitivity;
+        self.origin -= scrollward * self.controller.scroll * self.controller.speed * self.controller.sensitivity * dt;
         self.controller.scroll = 0.0;
 
         // Move up/down. Since we don't use roll, we can just
         // modify the y coordinate directly.
-        self.origin.y += (self.controller.amount_up - self.controller.amount_down) * self.controller.speed;
+        self.origin.y += (self.controller.amount_up - self.controller.amount_down) * self.controller.speed * dt;
 
         // Rotate
-        yaw += self.controller.rotate_horizontal * self.controller.sensitivity;
-        pitch += -self.controller.rotate_vertical * self.controller.sensitivity;
+        yaw += self.controller.rotate_horizontal * self.controller.sensitivity * dt;
+        pitch += -self.controller.rotate_vertical * self.controller.sensitivity * dt;
 
         // If process_mouse isn't called every frame, these values
         // will not get set to zero, and the camera will rotate

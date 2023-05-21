@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crate::{core::{*, context::Context}};
 
 use imgui_winit_support::winit::{event::{Event, WindowEvent, KeyboardInput, ElementState, VirtualKeyCode, DeviceEvent}, event_loop::ControlFlow};
@@ -16,6 +18,7 @@ pub async fn run(){
 
     let mut context = Context::new(&window).await;
 
+    let mut last_render_time = Instant::now();
     log::info!("Starting event_loop");
     window.event_loop.run(move |event, _, control_flow| {
         match event{
@@ -44,7 +47,10 @@ pub async fn run(){
                     }
                 }
             Event::RedrawRequested(window_id) if window_id == window.raw.id() => {
-                context.update();
+                let now = Instant::now();
+                let dt = now - last_render_time;
+                last_render_time = now;
+                context.update(dt);
                 match context.render(){
                     Ok(_) => {},
                     Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {

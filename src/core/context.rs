@@ -1,4 +1,4 @@
-use std::{mem, borrow::BorrowMut};
+use std::{mem, borrow::BorrowMut, time::Duration};
 
 use bytemuck::{Pod, Zeroable};
 use glam::{Vec3, Vec4};
@@ -23,6 +23,7 @@ pub struct Params {
     height : u32,
     number_of_bounces: i32,
     rays_per_pixel: i32,
+    toggle: i32,
 }
 
 
@@ -79,6 +80,7 @@ pub struct Context{
     pub camera: Camera,
     pub scene_buffer: wgpu::Buffer,
     pub mouse_pressed: bool,
+    pub dt: Duration,
 }
 
 impl Context{
@@ -181,6 +183,7 @@ impl Context{
             height: config.height,
             number_of_bounces: 1,
             rays_per_pixel: 1,
+            toggle: 0,
         };
         let params_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("parameters buffer"),
@@ -284,6 +287,11 @@ impl Context{
         println!("{} {}",camera.pitch, camera.yaw);
 
         let scene = [
+            Sphere::new(
+                Vec3::new(-3.64,-0.72,0.8028),0.75, 
+                Vec4::new(1.0,1.0,1.0,1.0),
+                Vec4::new(0.0,0.0,0.0,1.0),0.0,
+            ),
             Sphere::new(
                 Vec3::new(-2.54,-0.72,0.5),0.6, 
                 Vec4::new(1.0,0.0,0.0,1.0),
@@ -401,7 +409,7 @@ impl Context{
 
         let imgui_layer = ImguiLayer::new(window.as_ref(), &config, &device, &queue).await;
 
-
+        let dt = Duration::new(0,0);
         Self{
             device,
             queue,
@@ -422,6 +430,7 @@ impl Context{
             camera,
             scene_buffer,
             mouse_pressed: false,
+            dt
         }
     }
 
@@ -507,8 +516,9 @@ impl Context{
             _ => false,
         }
     }
-    pub fn update(&mut self){
-        self.camera.update_camera();
+    pub fn update(&mut self, dt: Duration){
+        self.dt = dt;
+        self.camera.update_camera(self.dt);
         let uniform = self.camera.to_uniform();
         self.queue.write_buffer(&self.camera.buffer, 0, bytemuck::cast_slice(&[uniform]));
         self.queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[self.params]));
@@ -553,12 +563,16 @@ impl Context{
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..6, 0, 0..1);
-
+            let mut toggle = self.params.toggle != 0;
             let ui = self.imgui_layer.context.frame();
             {
                 ui.window("Camera Info")
                     .size([200.0, 100.0], imgui::Condition::FirstUseEver)
                     .build(|| {
+                        ui.text(format!(
+                            "Frame time: ({:#?})",
+                            1000.0 /self.dt.as_millis() as f32
+                        ));
                         ui.text(format!(
                             "Position: ({})",
                             self.camera.origin
@@ -575,10 +589,12 @@ impl Context{
                             "yaw: ({})",
                             self.camera.yaw
                         ));
-                        ui.input_int("Number of bounces: ", &mut self.params.number_of_bounces).build();
-                        ui.input_int("Rays per pixel: ", &mut self.params.rays_per_pixel).build();
+                        ui.input_int("Bounces", &mut self.params.number_of_bounces).build();
+                        ui.input_int("Rays per pixel", &mut self.params.rays_per_pixel).build();
+                        ui.checkbox("Skybox", &mut toggle);
                     });
             }
+            self.params.toggle = toggle as i32;
 
             self.imgui_layer
             .render(&self.device, &self.queue, &mut render_pass)
