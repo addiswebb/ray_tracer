@@ -1,6 +1,8 @@
 struct Params{
     width: u32,
     height: u32,
+    number_of_bounces: i32,
+    rays_per_pixel: i32,
 };
 struct Material{
     color: vec4<f32>,
@@ -101,6 +103,18 @@ fn gen(state: u32) -> u32{
     result = (result >> 22u) ^ result;
     return result;
 }
+fn rand_2(state: ptr<function,u32>) -> f32{
+    *state = 0xadb4a92du * *state + 1u;
+
+    // Low bits have less randomness [L'ECUYER '99], so we'll shift the high
+    // bits into the mantissa position of an IEEE float32, then mask with
+    // the bit-pattern for 2.0
+    let m = (*state >> 9u) | 0x40000000u;
+
+    let f = bitcast<f32>(m);   // Range [2:4]
+    return f - 3.0;  
+}
+
 fn rand(state: f32) -> f32{
     return f32(gen(u32(state))) / 4294967295.0;
 }
@@ -111,12 +125,12 @@ fn rand_distribution(state: f32) -> f32{
     return rho * cos(theta);
 }
 
-fn rand_dir(state: f32) -> vec3<f32>{
-    let x = rand_distribution(state);
-    let y = rand_distribution(state * 2.0);
-    let z = rand_distribution(state * 3.0);
-    return normalize(vec3<f32>(x,y,z));
+fn rand_distribution_2(seed: ptr<function, u32>) -> f32{
+    let theta = 2.0 * 3.1415926 * rand_2(seed);
+    let rho = sqrt(-2.0 * log(rand_2(seed)));
+    return rho * cos(theta);
 }
+
 fn rand_unit_sphere(state: f32) -> vec3<f32>{
     for (var i = 0; i <= 100; i+=1){
         let p = 2.0 * vec3<f32>(rand(state),rand(state * 2.0),rand(state * 3.0)) - 1.0;
@@ -128,35 +142,40 @@ fn rand_unit_sphere(state: f32) -> vec3<f32>{
     }
     return vec3<f32>(0.0);
 }
-fn rand_hemisphere_dir(state: f32) -> vec3<f32>{
+
+fn rand_unit_sphere_2(state: ptr<function, u32>) -> vec3<f32>{
     for (var i = 0; i <= 100; i+=1){
-        let p = rand_dir(state);
+        let p = 2.0 * vec3<f32>(rand_2(state),rand_2(state),rand_2(state)) - 1.0;
         let sqr = pow(p, vec3<f32>(2.0));
         let length_sqr = sqr.x + sqr.y + sqr.z;
-        if (sqrt(length_sqr) < 1.0){
-            return normalize(p);
+        if(sqrt(length_sqr) < 1.0){
+            return p;
         }
     }
-    return vec3<f32>(1.0,1.0,1.0);
+    return vec3<f32>(0.0);
 }
-
-
 fn rand_hemisphere_dir_dist(normal: vec3<f32>, state: f32) -> vec3<f32>{
     let dir = rand_unit_sphere(state);
     return dir * sign(dot(normal, dir));
 }
 
-fn trace(ray: Ray, rng_state: f32) -> vec4<f32>{
+fn rand_hemisphere_dir_dist_2(normal: vec3<f32>, seed: ptr<function, u32>) -> vec3<f32>{
+    let dir = rand_unit_sphere_2(seed);
+    return dir * sign(dot(normal, dir));
+}
+
+fn trace(ray: Ray, seed: ptr<function, u32>) -> vec4<f32>{
     var ray: Ray = ray;
     var ray_color = vec4<f32>(1.0);
     var incoming_light = vec4<f32>(0.0);
     var normal = vec3<f32>(0.0);
-    for (var i = 0; i <= 2; i +=1){
+    for (var i = 0; i <= params.number_of_bounces; i +=1){
         var hit = calculate_ray_collions(ray);
         if (hit.hit){
             ray.origin = hit.hit_point;
-            ray.dir = normalize(rand_hemisphere_dir_dist(hit.normal,rng_state));
-            normal = hit.normal;
+            //change rand state per thing otherwise bad bouncing
+            ray.dir = rand_hemisphere_dir_dist_2(hit.normal,seed);
+            normal = ray.dir;
             let emitted_light = hit.material.emission_color * hit.material.emission_strength;
             incoming_light += emitted_light * ray_color;
             ray_color *= hit.material.color;
@@ -164,17 +183,23 @@ fn trace(ray: Ray, rng_state: f32) -> vec4<f32>{
             break;
         }
     }
-    return incoming_light;
+    return ray_color;
 }
 
 fn frag(i: FragInput) -> vec4<f32>{
     let pixel_coord = i.pos * i.size;
-    let pixel_index = pixel_coord.y * i.size.x + pixel_coord.x;
+    var rng_state = gen(u32(pixel_coord.y * i.size.x + pixel_coord.x));
 
     let pos = i.pos / i.size;
     var ray: Ray;
     ray.origin = camera.origin;
     ray.dir = normalize(camera.lower_left_corner + pos.x * camera.horizontal + pos.y * camera.vertical - ray.origin);
 
-    return trace(ray, pixel_index);
+    var total_incoming_light = vec4<f32>(0.0);
+
+    for (var i = 0; i <= params.rays_per_pixel; i+=1){
+        total_incoming_light += trace(ray, &rng_state);
+    } 
+
+    return total_incoming_light/f32(params.rays_per_pixel);
 }

@@ -1,8 +1,8 @@
-use std::{mem};
+use std::{mem, borrow::BorrowMut};
 
 use bytemuck::{Pod, Zeroable};
 use glam::{Vec3, Vec4};
-use imgui_winit_support::winit::{self, event::{WindowEvent, KeyboardInput, ElementState, MouseButton}};
+use imgui_winit_support::winit::{self, event::{WindowEvent, KeyboardInput, ElementState, MouseButton, VirtualKeyCode}};
 use wgpu::util::DeviceExt;
 
 use super::{window::Window, imgui::ImguiLayer, texture::Texture, camera::{Camera, }};
@@ -18,9 +18,11 @@ struct Vertex {
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable,Debug)]
-struct Params {
+pub struct Params {
     width : u32,
     height : u32,
+    number_of_bounces: i32,
+    rays_per_pixel: i32,
 }
 
 
@@ -72,7 +74,8 @@ pub struct Context{
     pub compute_bind_group: wgpu::BindGroup,
     pub compute_bind_group_layout: wgpu::BindGroupLayout,
     pub texture: Texture,
-    pub params: wgpu::Buffer,
+    pub params_buffer: wgpu::Buffer,
+    pub params: Params,
     pub camera: Camera,
     pub scene_buffer: wgpu::Buffer,
     pub mouse_pressed: bool,
@@ -173,13 +176,15 @@ impl Context{
             usage: wgpu::BufferUsages::INDEX,
         });
         println!("{} {}", config.width, config.height);
-        let params = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        let params = Params {
+            width: config.width,
+            height: config.height,
+            number_of_bounces: 1,
+            rays_per_pixel: 1,
+        };
+        let params_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("parameters buffer"),
-            contents: bytemuck::bytes_of(&
-                Params {
-                    width: config.width,
-                    height: config.height,
-            }),
+            contents: bytemuck::bytes_of(&params),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -211,7 +216,7 @@ impl Context{
             entries: &[
                 wgpu::BindGroupEntry{
                     binding: 0,
-                    resource: params.as_entire_binding(),
+                    resource: params_buffer.as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
@@ -304,7 +309,7 @@ impl Context{
             Sphere::new(
                 Vec3::new(-7.44,-0.72,20.0),15.0,
                 Vec4::new(0.1,0.1,0.1,0.0),
-                Vec4::new(1.0,1.0,1.0,1.0), 1.0,
+                Vec4::new(1.0,1.0,1.0,1.0), 2.0,
             )
         ];
 
@@ -365,7 +370,7 @@ impl Context{
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: params.as_entire_binding(),
+                    resource: params_buffer.as_entire_binding(),
                 },
                 wgpu::BindGroupEntry{
                     binding: 1,
@@ -412,6 +417,7 @@ impl Context{
             compute_bind_group,
             compute_bind_group_layout,
             texture,
+            params_buffer,
             params,
             camera,
             scene_buffer,
@@ -425,18 +431,18 @@ impl Context{
             self.config.height = size.height;
             self.surface.configure(&self.device, &self.config);
             self.texture = Texture::new(&self.device,size.width,size.height,wgpu::TextureFormat::Rgba32Float);
-            let params = Params{
-                width: size.width,
-                height: size.height,
-            };
-            self.queue.write_buffer(&self.params, 0, bytemuck::cast_slice(&[params]));
+
+            self.params.width = size.width;
+            self.params.height = size.height;
+
+            self.queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[self.params]));
             self.compute_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor{
                 label: Some("Compute Bind Group"),
                 layout: &self.compute_bind_group_layout,
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
-                        resource: self.params.as_entire_binding(),
+                        resource: self.params_buffer.as_entire_binding(),
                     },
                     wgpu::BindGroupEntry {
                         binding: 1,
@@ -458,7 +464,7 @@ impl Context{
                 entries: &[
                     wgpu::BindGroupEntry{
                         binding: 0,
-                        resource: self.params.as_entire_binding(),
+                        resource: self.params_buffer.as_entire_binding(),
                     },
                     wgpu::BindGroupEntry {
                         binding: 1,
@@ -504,6 +510,7 @@ impl Context{
         self.camera.update_camera();
         let uniform = self.camera.to_uniform();
         self.queue.write_buffer(&self.camera.buffer, 0, bytemuck::cast_slice(&[uniform]));
+        self.queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[self.params]));
     }
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError>{
         let output = self.surface.get_current_texture()?;
@@ -567,6 +574,8 @@ impl Context{
                             "yaw: ({})",
                             self.camera.yaw
                         ));
+                        ui.input_int("Number of bounces: ", &mut self.params.number_of_bounces).build();
+                        ui.input_int("Rays per pixel: ", &mut self.params.rays_per_pixel).build();
                     });
             }
 
