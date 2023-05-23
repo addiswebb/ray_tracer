@@ -143,8 +143,9 @@ fn trace(ray: Ray, seed: ptr<function, u32>) -> vec4<f32>{
             ray.origin = hit.hit_point;
             ray.dir = rand_hemisphere_dir_dist(hit.normal, seed);
             let emitted_light = hit.material.emission_color * hit.material.emission_strength;
+            var light_strength = dot(hit.normal, ray.dir) * 2.0;
             incoming_light += emitted_light * ray_color;
-            ray_color *= hit.material.color;
+            ray_color *= hit.material.color * light_strength;
         }else{
             if(params.toggle != 0){
                 incoming_light += get_environment_light(ray) * ray_color;
