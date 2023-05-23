@@ -37,6 +37,34 @@ struct Sphere{
     emission_strength: f32,
     _padding: [f32;3],
 }
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
+struct Triangle{
+    pos_a: [f32;3], 
+    _padding1: f32,
+    pos_b: [f32;3], 
+    _padding2: f32,
+    pos_c: [f32;3], 
+    _padding3: f32,
+    normal_a: [f32;3], 
+    _padding4: f32,
+    normal_b: [f32;3], 
+    _padding5: f32,
+    normal_c: [f32;3], 
+    _padding6: f32,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
+struct Mesh{
+    offset: u32,
+    length: u32,
+    _padding2: [f32;2],
+    color: [f32;4],
+    emission_color: [f32;4],
+    emission_strength: f32,
+    _padding3: [f32;3],
+}
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
@@ -55,6 +83,37 @@ impl Sphere{
             emission_color: emission_color.to_array(),
             emission_strength,
             _padding: [123.0;3],
+        }
+    }
+}
+impl Triangle{
+    pub fn new(pos_a: Vec3, pos_b: Vec3, pos_c: Vec3, normal_a: Vec3,normal_b: Vec3,normal_c: Vec3) -> Self{
+        Self { 
+            pos_a: pos_a.to_array(), 
+            _padding1: 0.0,
+            pos_b: pos_b.to_array(),
+            _padding2: 0.0,
+            pos_c: pos_c.to_array(),
+            _padding3: 0.0,
+            normal_a: normal_a.to_array(), 
+            _padding4: 0.0,
+            normal_b: normal_b.to_array(),
+            _padding5: 0.0,
+            normal_c: normal_c.to_array(),
+            _padding6: 0.0,
+        }
+    }
+}
+impl Mesh{
+    pub fn new(offset: u32, length: u32,color: Vec4, emission_color: Vec4, emission_strength: f32)->Self{
+        Self{
+            offset,
+            length,
+            _padding2: [0.0;2],
+            color: color.to_array(),
+            emission_color: emission_color.to_array(),
+            emission_strength,
+            _padding3: [0.0;3],
         }
     }
 }
@@ -78,7 +137,9 @@ pub struct Context{
     pub params_buffer: wgpu::Buffer,
     pub params: Params,
     pub camera: Camera,
-    pub scene_buffer: wgpu::Buffer,
+    pub sphere_buffer: wgpu::Buffer,
+    pub triangle_buffer: wgpu::Buffer,
+    pub mesh_buffer: wgpu::Buffer,
     pub mouse_pressed: bool,
     pub dt: Duration,
 }
@@ -91,12 +152,6 @@ impl Context{
         }
     }
     fn create_vertices() -> (Vec<Vertex>, Vec<u16>) {
-/*         let vertex_data = [
-            Context::vertex([-1,-1], [0, 0]),
-            Context::vertex([ 1,-1], [1, 0]),
-            Context::vertex([ 1, 1], [1, 1]),
-            Context::vertex([-1, 1], [0, 1]),
-        ]; */
 
         let vertex_data = [
             Context::vertex([-1,-1], [1, 0]),
@@ -286,7 +341,7 @@ impl Context{
 /*         let camera = Camera::new(&device,Vec3::new(-2.7,1.3,-8.0),Vec3::new(-2.6,1.0,-7.0),Vec3::new(0.0,1.0,0.0),28.0,config.width as f32/config.height as f32,0.1,100.0); */
         println!("{} {}",camera.pitch, camera.yaw);
 
-        let scene = [
+        let spheres= [
             Sphere::new(
                 Vec3::new(-3.64,-0.72,0.8028),0.75, 
                 Vec4::new(1.0,1.0,1.0,1.0),
@@ -321,9 +376,46 @@ impl Context{
             )
         ];
 
-        let scene_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
-            label: Some("Scene Buffer"),
-            contents: bytemuck::bytes_of(&scene),
+        let triangles = [
+            Triangle::new(
+                Vec3::new(2.0, 1.0, 1.0) * 10.0,
+                Vec3::new(4.0, 1.0, 2.0) * 10.0,
+                Vec3::new(3.0, 0.0, 4.0) * 10.0,
+                Vec3::new(2.0,-3.0,-1.0),
+                Vec3::new(4.0,-3.0, 0.0),
+                Vec3::new(3.0,-4.0, 2.0),
+            ),
+            Triangle::new(
+                Vec3::new(2.0, 1.0, 1.0),
+                Vec3::new(4.0, 1.0, 2.0),
+                Vec3::new(3.0, 0.0, 4.0),
+                Vec3::new(2.0,-3.0,-1.0),
+                Vec3::new(4.0,-3.0, 0.0),
+                Vec3::new(3.0,-4.0, 2.0),
+            )
+        ];
+        let meshes = [
+            Mesh::new(
+                0,2,
+                Vec4::new(0.0,0.6,0.0,1.0),
+                Vec4::new(1.0,1.0,1.0,1.0), 0.0,
+            ),
+        ];
+
+        let sphere_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
+            label: Some("Sphere Buffer"),
+            contents: bytemuck::bytes_of(&spheres),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST| wgpu::BufferUsages::STORAGE,
+        }); 
+
+        let triangle_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
+            label: Some("Triangle Buffer"),
+            contents: bytemuck::bytes_of(&triangles),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST| wgpu::BufferUsages::STORAGE,
+        }); 
+        let mesh_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
+            label: Some("Mesh Buffer"),
+            contents: bytemuck::bytes_of(&meshes),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST| wgpu::BufferUsages::STORAGE,
         }); 
 
@@ -359,14 +451,36 @@ impl Context{
                     ty: texture.binding_type(wgpu::StorageTextureAccess::WriteOnly),
                     count: None,
                 },
-                //Scene
+                //Spheres
                 wgpu::BindGroupLayoutEntry {
                     binding: 3,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer{
                         ty: wgpu::BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: wgpu::BufferSize::new((mem::size_of::<Sphere>() * scene.len()) as _),
+                        min_binding_size: wgpu::BufferSize::new((mem::size_of::<Sphere>() * spheres.len()) as _),
+                    },
+                    count: None,
+                },
+                //Triangles
+                wgpu::BindGroupLayoutEntry {
+                    binding: 4,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer{
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: wgpu::BufferSize::new((mem::size_of::<Triangle>() * triangles.len()) as _),
+                    },
+                    count: None,
+                },
+                //Meshes
+                wgpu::BindGroupLayoutEntry {
+                    binding: 5,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer{
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: wgpu::BufferSize::new((mem::size_of::<Mesh>() * meshes.len()) as _),
                     },
                     count: None,
                 },
@@ -390,7 +504,15 @@ impl Context{
                 },
                 wgpu::BindGroupEntry{
                     binding: 3,
-                    resource: scene_buffer.as_entire_binding(),
+                    resource: sphere_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry{
+                    binding: 4,
+                    resource: triangle_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry{
+                    binding: 5,
+                    resource: mesh_buffer.as_entire_binding(),
                 },
             ],
         });
@@ -428,7 +550,9 @@ impl Context{
             params_buffer,
             params,
             camera,
-            scene_buffer,
+            sphere_buffer,
+            triangle_buffer,
+            mesh_buffer,
             mouse_pressed: false,
             dt
         }
@@ -464,7 +588,15 @@ impl Context{
                     },
                     wgpu::BindGroupEntry {
                         binding: 3,
-                        resource: self.scene_buffer.as_entire_binding(),
+                        resource: self.sphere_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 4,
+                        resource: self.triangle_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 5,
+                        resource: self.mesh_buffer.as_entire_binding(),
                     },
                 ],
             });
