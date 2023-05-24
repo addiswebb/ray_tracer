@@ -11,7 +11,7 @@ const WORKGROUP_SIZE: (u32, u32) = (8, 8);
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
-struct Vertex {
+struct TexVertex {
     _pos: [f32; 4],
     _tex_coord: [f32; 2],
 }
@@ -36,22 +36,6 @@ struct Sphere{
     emission_color: [f32;4],
     emission_strength: f32,
     _padding: [f32;3],
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
-struct Triangle{
-    pos_a: [f32;3], 
-    _padding1: f32,
-    pos_b: [f32;3], 
-    _padding2: f32,
-    pos_c: [f32;3], 
-    _padding3: f32,
-    normal_a: [f32;3], 
-    _padding4: f32,
-    normal_b: [f32;3], 
-    _padding5: f32,
-    normal_c: [f32;3], 
-    _padding6: f32,
 }
 
 #[repr(C)]
@@ -86,24 +70,7 @@ impl Sphere{
         }
     }
 }
-impl Triangle{
-    pub fn new(pos_a: Vec3, pos_b: Vec3, pos_c: Vec3, normal_a: Vec3,normal_b: Vec3,normal_c: Vec3) -> Self{
-        Self { 
-            pos_a: pos_a.to_array(), 
-            _padding1: 0.0,
-            pos_b: pos_b.to_array(),
-            _padding2: 0.0,
-            pos_c: pos_c.to_array(),
-            _padding3: 0.0,
-            normal_a: normal_a.to_array(), 
-            _padding4: 0.0,
-            normal_b: normal_b.to_array(),
-            _padding5: 0.0,
-            normal_c: normal_c.to_array(),
-            _padding6: 0.0,
-        }
-    }
-}
+
 impl Mesh{
     pub fn new(offset: u32, length: u32,color: Vec4, emission_color: Vec4, emission_strength: f32)->Self{
         Self{
@@ -118,6 +85,20 @@ impl Mesh{
     }
 }
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
+struct Vertex{
+    pos: [f32;3],
+    _padding1: f32,
+    normal: [f32;3],
+    _padding2: f32,
+}
+
+impl Vertex{
+    pub fn new(pos: Vec3, normal: Vec3) -> Self{
+        Self { pos: pos.to_array(), _padding1: 0.0, normal: normal.to_array(), _padding2: 0.0 }
+    }
+}
 
 pub struct Context{
     pub device: wgpu::Device,
@@ -126,8 +107,8 @@ pub struct Context{
     pub config: wgpu::SurfaceConfiguration,
     pub pipeline: wgpu::RenderPipeline,
     pub imgui_layer: ImguiLayer,
-    pub vertex_buffer: wgpu::Buffer,
-    pub index_buffer: wgpu::Buffer,
+    pub tex_vertex_buffer: wgpu::Buffer,
+    pub tex_index_buffer: wgpu::Buffer,
     pub bind_group: wgpu::BindGroup,
     pub bind_group_layout: wgpu::BindGroupLayout,
     pub compute_pipeline: wgpu::ComputePipeline,
@@ -138,20 +119,21 @@ pub struct Context{
     pub params: Params,
     pub camera: Camera,
     pub sphere_buffer: wgpu::Buffer,
-    pub triangle_buffer: wgpu::Buffer,
+    pub vertex_buffer: wgpu::Buffer,
+    pub index_buffer: wgpu::Buffer,
     pub mesh_buffer: wgpu::Buffer,
     pub mouse_pressed: bool,
     pub dt: Duration,
 }
 
 impl Context{
-    fn vertex(pos: [i8; 2], tc: [i8; 2]) -> Vertex {
-        Vertex {
+    fn vertex(pos: [i8; 2], tc: [i8; 2]) -> TexVertex {
+        TexVertex {
             _pos: [pos[0] as f32, pos[1] as f32, 1.0, 1.0],
             _tex_coord: [tc[0] as f32, tc[1] as f32],
         }
     }
-    fn create_vertices() -> (Vec<Vertex>, Vec<u16>) {
+    fn create_vertices() -> (Vec<TexVertex>, Vec<u16>) {
 
         let vertex_data = [
             Context::vertex([-1,-1], [1, 0]),
@@ -222,12 +204,12 @@ impl Context{
         });
 
         let (vertices, indices) = Context::create_vertices();
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
+        let tex_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
             label: Some("Vertex Buffer"),
             contents: bytemuck::cast_slice(&vertices),
             usage: wgpu::BufferUsages::VERTEX,
         });
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
+        let tex_index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
             label: Some("Index Buffer"),
             contents: bytemuck::cast_slice(&indices),
             usage: wgpu::BufferUsages::INDEX,
@@ -297,7 +279,7 @@ impl Context{
                 entry_point: "vert",
                 buffers: &[
                     wgpu::VertexBufferLayout{
-                        array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
+                        array_stride: std::mem::size_of::<TexVertex>() as wgpu::BufferAddress,
                         step_mode: wgpu::VertexStepMode::Vertex,
                         attributes: &wgpu::vertex_attr_array![0=> Float32x4,1=>Float32x2],
                     },
@@ -376,24 +358,16 @@ impl Context{
             )
         ];
 
-        let triangles = [
-            Triangle::new(
-                Vec3::new(2.0, 1.0, 1.0) * 10.0,
-                Vec3::new(4.0, 1.0, 2.0) * 10.0,
-                Vec3::new(3.0, 0.0, 4.0) * 10.0,
-                Vec3::new(2.0,-3.0,-1.0),
-                Vec3::new(4.0,-3.0, 0.0),
-                Vec3::new(3.0,-4.0, 2.0),
-            ),
-            Triangle::new(
-                Vec3::new(2.0, 1.0, 1.0),
-                Vec3::new(4.0, 1.0, 2.0),
-                Vec3::new(3.0, 0.0, 4.0),
-                Vec3::new(2.0,-3.0,-1.0),
-                Vec3::new(4.0,-3.0, 0.0),
-                Vec3::new(3.0,-4.0, 2.0),
-            )
+        let vertices = [
+            Vertex::new(Vec3::new(2.0, 1.0, 1.0) * 10.0, Vec3::new(2.0,-3.0,-1.0)),
+            Vertex::new(Vec3::new(4.0, 1.0, 2.0) * 10.0, Vec3::new(4.0,-3.0, 0.0)),
+            Vertex::new(Vec3::new(3.0, 0.0, 4.0) * 10.0, Vec3::new(3.0,-4.0, 2.0)),
+            Vertex::new(Vec3::new(2.0, 1.0, 1.0), Vec3::new(2.0,-3.0,-1.0)),
+            Vertex::new(Vec3::new(4.0, 1.0, 2.0), Vec3::new(4.0,-3.0, 0.0)),
+            Vertex::new(Vec3::new(3.0, 0.0, 4.0), Vec3::new(3.0,-4.0, 2.0)),
         ];
+        let indices = [0u32,1u32,2u32,3u32,4u32,5u32];
+
         let meshes = [
             Mesh::new(
                 0,2,
@@ -408,9 +382,15 @@ impl Context{
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST| wgpu::BufferUsages::STORAGE,
         }); 
 
-        let triangle_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
-            label: Some("Triangle Buffer"),
-            contents: bytemuck::bytes_of(&triangles),
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::bytes_of(&vertices),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST| wgpu::BufferUsages::STORAGE,
+        }); 
+
+        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
+            label: Some("Index Buffer"),
+            contents: bytemuck::bytes_of(&indices),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST| wgpu::BufferUsages::STORAGE,
         }); 
         let mesh_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
@@ -462,20 +442,31 @@ impl Context{
                     },
                     count: None,
                 },
-                //Triangles
+                //Vertex buffer
                 wgpu::BindGroupLayoutEntry {
                     binding: 4,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer{
                         ty: wgpu::BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: wgpu::BufferSize::new((mem::size_of::<Triangle>() * triangles.len()) as _),
+                        min_binding_size: wgpu::BufferSize::new((mem::size_of::<Vertex>() * vertices.len()) as _),
+                    },
+                    count: None,
+                },
+                //Index buffer
+                wgpu::BindGroupLayoutEntry {
+                    binding: 5,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer{
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: wgpu::BufferSize::new((mem::size_of::<u32>() * indices.len()) as _),
                     },
                     count: None,
                 },
                 //Meshes
                 wgpu::BindGroupLayoutEntry {
-                    binding: 5,
+                    binding: 6,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer{
                         ty: wgpu::BufferBindingType::Storage { read_only: true },
@@ -508,10 +499,14 @@ impl Context{
                 },
                 wgpu::BindGroupEntry{
                     binding: 4,
-                    resource: triangle_buffer.as_entire_binding(),
+                    resource: vertex_buffer.as_entire_binding(),
                 },
                 wgpu::BindGroupEntry{
                     binding: 5,
+                    resource: index_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry{
+                    binding: 6,
                     resource: mesh_buffer.as_entire_binding(),
                 },
             ],
@@ -539,8 +534,8 @@ impl Context{
             config,
             pipeline,
             imgui_layer,
-            vertex_buffer,
-            index_buffer,
+            tex_vertex_buffer,
+            tex_index_buffer,
             bind_group,
             bind_group_layout,
             compute_pipeline,
@@ -551,7 +546,8 @@ impl Context{
             params,
             camera,
             sphere_buffer,
-            triangle_buffer,
+            vertex_buffer,
+            index_buffer,
             mesh_buffer,
             mouse_pressed: false,
             dt
@@ -592,10 +588,14 @@ impl Context{
                     },
                     wgpu::BindGroupEntry {
                         binding: 4,
-                        resource: self.triangle_buffer.as_entire_binding(),
+                        resource: self.vertex_buffer.as_entire_binding(),
                     },
                     wgpu::BindGroupEntry {
                         binding: 5,
+                        resource: self.index_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 6,
                         resource: self.mesh_buffer.as_entire_binding(),
                     },
                 ],
@@ -692,8 +692,8 @@ impl Context{
             
             render_pass.set_pipeline(&self.pipeline);
             render_pass.set_bind_group(0, &self.bind_group,&[]);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.set_vertex_buffer(0, self.tex_vertex_buffer.slice(..));
+            render_pass.set_index_buffer(self.tex_index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..6, 0, 0..1);
             let mut toggle = self.params.toggle != 0;
             let ui = self.imgui_layer.context.frame();

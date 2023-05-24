@@ -17,20 +17,16 @@ struct Sphere{
     material: Material,
 };
 
-struct Triangle{
-    pos_a: vec3<f32>,
-    pos_b: vec3<f32>,
-    pos_c: vec3<f32>,
-    normal_a: vec3<f32>,
-    normal_b: vec3<f32>,
-    normal_c: vec3<f32>
-}
+struct Vertex{
+    pos: vec3<f32>,
+    normal: vec3<f32>
+};
 
 struct Mesh{
     offset: u32,
     length: u32,
     material: Material,
-}
+};
 
 @group(0) @binding(0)
 var<uniform> params: Params;
@@ -41,8 +37,10 @@ var texture: texture_storage_2d<rgba32float,write>;
 @group(0) @binding(3)
 var<storage,read> spheres: array<Sphere>;
 @group(0) @binding(4)
-var<storage,read> triangles: array<Triangle>;
+var<storage,read> vertices: array<Vertex>;
 @group(0) @binding(5)
+var<storage,read> indices: array<u32>;
+@group(0) @binding(6)
 var<storage,read> meshes: array<Mesh>;
 
 @compute
@@ -106,12 +104,12 @@ fn ray_sphere(ray: Ray, pos: vec3<f32>, radius: f32) -> Hit{
     return hit;
 }
 
-fn ray_triangle(ray: Ray, tri: Triangle) -> Hit{
+fn ray_triangle(ray: Ray, a: Vertex, b: Vertex, c: Vertex) -> Hit{
     var hit: Hit;
-    let edge_ab = tri.pos_b - tri.pos_a;
-    let edge_ac = tri.pos_c - tri.pos_a;
+    let edge_ab = b.pos - a.pos;
+    let edge_ac = c.pos - a.pos;
     let normal = cross(edge_ab, edge_ac);
-    let ao = ray.origin - tri.pos_a;
+    let ao = ray.origin - a.pos;
     let dao = cross(ao, ray.dir);
 
     let determinant = -dot(ray.dir, normal);
@@ -124,7 +122,7 @@ fn ray_triangle(ray: Ray, tri: Triangle) -> Hit{
 
     hit.hit = determinant >= 1e-6 && dst >= 0.0 && u >= 0.0 && v >= 0.0 && w >= 0.0;
     hit.hit_point = ray.origin + ray.dir * dst;
-    hit.normal = normalize(tri.normal_a * w + tri.normal_b * u + tri.normal_c * v);
+    hit.normal = normalize(a.normal * w + b.normal * u + c.normal * v);
     hit.dst = dst;
 
     return hit;
@@ -140,16 +138,30 @@ fn calculate_ray_collions(ray: Ray) -> Hit{
             closest_hit.material = spheres[i].material;
         }
     }
-    for(var mesh_index: u32 = 0u; mesh_index < arrayLength(&meshes); mesh_index+=1u){
+    for(var mesh_index: u32 = 0u; mesh_index< arrayLength(&meshes); mesh_index+=1u){
         for(var i: u32 = 0u; i < meshes[mesh_index].length; i+=1u){
-            let tri_index = meshes[mesh_index].offset + i;
-            var hit: Hit = ray_triangle(ray, triangles[tri_index]);
+            let index = indices[meshes[mesh_index].offset + i] * 3u;
+            let v1 = vertices[index];
+            let v2 = vertices[index+1u];
+            let v3 = vertices[index+2u];
+
+            var hit: Hit = ray_triangle(ray, v1,v2,v3);
             if hit.hit && hit.dst < closest_hit.dst{
                 closest_hit = hit;
                 closest_hit.material = meshes[mesh_index].material;
             }
         }
     }
+    // for(var mesh_index: u32 = 0u; mesh_index < arrayLength(&meshes); mesh_index+=1u){
+    //     for(var i: u32 = 0u; i < meshes[mesh_index].length; i+=1u){
+    //         let tri_index = meshes[mesh_index].offset + i;
+    //         var hit: Hit = ray_triangle(ray, triangles[tri_index]);
+    //         if hit.hit && hit.dst < closest_hit.dst{
+    //             closest_hit = hit;
+    //             closest_hit.material = meshes[mesh_index].material;
+    //         }
+    //     }
+    // }
     return closest_hit;
 }
 
@@ -203,7 +215,7 @@ fn trace(ray: Ray, seed: ptr<function, u32>) -> vec4<f32>{
             break;
         }
     }
-    return color;
+    return incoming_light;
 }
 
 fn get_environment_light(ray: Ray) -> vec4<f32>{
