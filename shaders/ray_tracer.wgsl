@@ -25,6 +25,7 @@ struct Vertex{
 struct Mesh{
     offset: u32,
     length: u32,
+    pos: vec3<f32>,
     material: Material,
 };
 
@@ -141,9 +142,13 @@ fn calculate_ray_collions(ray: Ray) -> Hit{
     for(var mesh_index: u32 = 0u; mesh_index< arrayLength(&meshes); mesh_index+=1u){
         for(var i: u32 = 0u; i < meshes[mesh_index].length; i+=1u){
             let index = indices[meshes[mesh_index].offset + i] * 3u;
-            let v1 = vertices[index];
-            let v2 = vertices[index+1u];
-            let v3 = vertices[index+2u];
+            var v1 = vertices[index];
+            var v2 = vertices[index+1u];
+            var v3 = vertices[index+2u];
+
+            v1.pos += meshes[mesh_index].pos;
+            v2.pos += meshes[mesh_index].pos;
+            v3.pos += meshes[mesh_index].pos;
 
             var hit: Hit = ray_triangle(ray, v1,v2,v3);
             if hit.hit && hit.dst < closest_hit.dst{

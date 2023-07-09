@@ -1,9 +1,11 @@
-use std::{mem, borrow::BorrowMut, time::Duration};
+use std::{mem, borrow::BorrowMut, time::Duration, path::Path};
 
 use bytemuck::{Pod, Zeroable};
 use glam::{Vec3, Vec4};
 use imgui_winit_support::winit::{self, event::{WindowEvent, KeyboardInput, ElementState, MouseButton, VirtualKeyCode}};
 use wgpu::util::DeviceExt;
+
+use crate::core::resource::{load_model_obj, load_model};
 
 use super::{window::Window, imgui::ImguiLayer, texture::Texture, camera::{Camera, }};
 
@@ -40,14 +42,16 @@ struct Sphere{
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
-struct Mesh{
-    offset: u32,
-    length: u32,
-    _padding2: [f32;2],
-    color: [f32;4],
-    emission_color: [f32;4],
-    emission_strength: f32,
-    _padding3: [f32;3],
+pub struct Mesh{
+    pub offset: u32,
+    pub length: u32,
+    pub _padding2: [f32;2],
+    pub pos: [f32;3],
+    pub _padding: f32,
+    pub color: [f32;4],
+    pub emission_color: [f32;4],
+    pub emission_strength: f32,
+    pub _padding3: [f32;3],
 }
 
 #[repr(C)]
@@ -72,11 +76,13 @@ impl Sphere{
 }
 
 impl Mesh{
-    pub fn new(offset: u32, length: u32,color: Vec4, emission_color: Vec4, emission_strength: f32)->Self{
+    pub fn new(pos: Vec3, offset: u32, length: u32,color: Vec4, emission_color: Vec4, emission_strength: f32)->Self{
         Self{
             offset,
             length,
             _padding2: [0.0;2],
+            pos: pos.to_array(),
+            _padding: 0.0,
             color: color.to_array(),
             emission_color: emission_color.to_array(),
             emission_strength,
@@ -87,11 +93,11 @@ impl Mesh{
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
-struct Vertex{
-    pos: [f32;3],
-    _padding1: f32,
-    normal: [f32;3],
-    _padding2: f32,
+pub struct Vertex{
+    pub pos: [f32;3],
+    pub _padding1: f32,
+    pub normal: [f32;3],
+    pub _padding2: f32,
 }
 
 impl Vertex{
@@ -358,7 +364,7 @@ impl Context{
             )
         ];
 
-        let vertices = [
+        let mut vertices = vec![
             Vertex::new(Vec3::new(2.0, 1.0, 1.0) * 10.0, Vec3::new(2.0,-3.0,-1.0)),
             Vertex::new(Vec3::new(4.0, 1.0, 2.0) * 10.0, Vec3::new(4.0,-3.0, 0.0)),
             Vertex::new(Vec3::new(3.0, 0.0, 4.0) * 10.0, Vec3::new(3.0,-4.0, 2.0)),
@@ -366,15 +372,19 @@ impl Context{
             Vertex::new(Vec3::new(4.0, 1.0, 2.0), Vec3::new(4.0,-3.0, 0.0)),
             Vertex::new(Vec3::new(3.0, 0.0, 4.0), Vec3::new(3.0,-4.0, 2.0)),
         ];
-        let indices = [0u32,1u32,2u32,3u32,4u32,5u32];
+        let mut indices = vec![0u32,1u32,2u32,3u32,4u32,5u32];
 
-        let meshes = [
+        let mut meshes = vec![
             Mesh::new(
+                Vec3::new(0.0,0.0,0.0),
                 0,2,
                 Vec4::new(0.0,0.6,0.0,1.0),
                 Vec4::new(1.0,1.0,1.0,1.0), 0.0,
             ),
         ];
+        for _ in 0..10{
+            load_model(Path::new("cube2.obj"), &mut vertices, &mut indices, &mut meshes).await.unwrap();
+        }
 
         let sphere_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
             label: Some("Sphere Buffer"),
@@ -382,20 +392,21 @@ impl Context{
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST| wgpu::BufferUsages::STORAGE,
         }); 
 
+        let x = vertices.as_slice();
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
             label: Some("Vertex Buffer"),
-            contents: bytemuck::bytes_of(&vertices),
+            contents: bytemuck::cast_slice(&vertices),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST| wgpu::BufferUsages::STORAGE,
         }); 
 
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
             label: Some("Index Buffer"),
-            contents: bytemuck::bytes_of(&indices),
+            contents: bytemuck::cast_slice(&indices),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST| wgpu::BufferUsages::STORAGE,
         }); 
         let mesh_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
             label: Some("Mesh Buffer"),
-            contents: bytemuck::bytes_of(&meshes),
+            contents: bytemuck::cast_slice(&meshes),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST| wgpu::BufferUsages::STORAGE,
         }); 
 
