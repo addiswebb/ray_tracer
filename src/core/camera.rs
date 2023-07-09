@@ -216,6 +216,7 @@ impl CameraController{
 pub fn radians(deg: f32)->f32{
     deg * (std::f32::consts::PI / 180.0)
 }
+#[allow(unused)]
 pub fn degrees(rad: f32) -> f32{
     rad * (180.0/std::f32::consts::PI)
 }

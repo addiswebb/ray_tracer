@@ -1,11 +1,11 @@
-use std::{mem, borrow::BorrowMut, time::Duration, path::Path};
+use std::{mem, time::Duration, path::Path};
 
 use bytemuck::{Pod, Zeroable};
 use glam::{Vec3, Vec4};
-use imgui_winit_support::winit::{self, event::{WindowEvent, KeyboardInput, ElementState, MouseButton, VirtualKeyCode}};
+use imgui_winit_support::winit::{self, event::{WindowEvent, KeyboardInput, ElementState, MouseButton }};
 use wgpu::util::DeviceExt;
 
-use crate::core::resource::{load_model_obj, load_model};
+use crate::core::resource::load_model;
 
 use super::{window::Window, imgui::ImguiLayer, texture::Texture, camera::{Camera, }};
 
@@ -392,7 +392,6 @@ impl Context{
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST| wgpu::BufferUsages::STORAGE,
         }); 
 
-        let x = vertices.as_slice();
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
             label: Some("Vertex Buffer"),
             contents: bytemuck::cast_slice(&vertices),
