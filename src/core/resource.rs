@@ -1,5 +1,4 @@
 use std::{io::{BufReader, Cursor}, path::Path};
-
 use super::context::{Mesh, Vertex};
 
 const FILE: &str = concat!(env!("CARGO_MANIFEST_DIR"));
@@ -68,35 +67,39 @@ pub async fn load_model_obj(
     )
     .await?;
 
+
     for mut m in models{
+        meshes.push(Mesh{
+            triangles: m.mesh.indices.len() as u32 /3,
+            first: indices.len() as u32,
+            offset: vertices.len() as u32,
+            _padding2: 0.0,
+            pos: [meshes.len() as f32 * 3.0, 0.0,0.0],
+            _padding: 0.0,
+            color: [0.2,0.2,1.0,1.0],
+            emission_color: [0.0;4],
+            emission_strength: 0.0,
+            _padding3: [0.0;3],
+        });
         vertices.append(&mut (0..m.mesh.positions.len() / 3)
-            .map(|i| Vertex{
-                pos: [
-                    m.mesh.positions[i * 3],
-                    m.mesh.positions[i * 3 + 1],
-                    m.mesh.positions[i * 3 + 2],
-                ],
-                _padding1: 0.0,
-                normal: [
-                    m.mesh.normals[i * 3],
-                    m.mesh.normals[i * 3 + 1],
-                    m.mesh.normals[i * 3 + 2],
-                ],
-                _padding2: 0.0,
+            .map(|i| {
+                Vertex{
+                    pos: [
+                        m.mesh.positions[i * 3],
+                        m.mesh.positions[i * 3 + 1],
+                        m.mesh.positions[i * 3 + 2],
+                    ],
+                    _padding1: 0.0,
+                    normal: [
+                        m.mesh.normals[i * 3],
+                        m.mesh.normals[i * 3 + 1],
+                        m.mesh.normals[i * 3 + 2],
+                    ],
+                    _padding2: 0.0,
+                }
             })
             .collect::<Vec<_>>());
-            meshes.push(Mesh{
-                length: m.mesh.indices.len() as u32,
-                offset: indices.len() as u32 - 1,
-                _padding2: [0.0;2],
-                pos: [meshes.len() as f32 * 3.0, 0.0,0.0],
-                _padding: 0.0,
-                color: [0.2,0.2,1.0,1.0],
-                emission_color: [0.0;4],
-                emission_strength: 0.0,
-                _padding3: [0.0;3],
-            });
-            indices.append(&mut m.mesh.indices);
+        indices.append(&mut m.mesh.indices);
     }
     Ok(())
 }
@@ -154,6 +157,20 @@ pub async fn load_model_gltf(
                 };
                 log::info!("[END  ] Reading indices");
 
+
+                meshes.push(Mesh{
+                    triangles: new_indices.len() as u32 / 3,
+                    first: indices.len() as u32,
+                    offset: vertices.len() as u32,
+                    _padding2: 0.0,
+                    pos: [meshes.len() as f32 * 3.0, 0.0,0.0],
+                    _padding: 0.0,
+                    color: [0.2,0.2,1.0,1.0],
+                    emission_color: [0.0;4],
+                    emission_strength: 0.0,
+                    _padding3: [0.0;3],
+                });
+
                 vertices.append(&mut positions
                     .zip(normals)
                     .map(|(pos, normal)| Vertex {
@@ -163,18 +180,6 @@ pub async fn load_model_gltf(
                         _padding2: 0.0,
                     })
                     .collect::<Vec<Vertex>>());
-
-                meshes.push(Mesh{
-                    length: new_indices.len() as u32,
-                    offset: indices.len() as u32 - 1,
-                    _padding2: [0.0;2],
-                    pos: [meshes.len() as f32 * 3.0, 0.0,0.0],
-                    _padding: 0.0,
-                    color: [0.2,0.2,1.0,1.0],
-                    emission_color: [0.0;4],
-                    emission_strength: 0.0,
-                    _padding3: [0.0;3],
-                });
                 indices.append(&mut new_indices);
             });
         }
@@ -241,6 +246,19 @@ pub async fn load_model_glb(
             };
             log::info!("[END  ] Reading indices");
 
+            meshes.push(Mesh{
+                triangles: new_indices.len() as u32 / 3,
+                first: indices.len() as u32,
+                offset: vertices.len() as u32,
+                _padding2: 0.0,
+                pos: [meshes.len() as f32 * 3.0, 0.0,0.0],
+                _padding: 0.0,
+                color: [0.2,0.2,1.0,1.0],
+                emission_color: [0.0;4],
+                emission_strength: 0.0,
+                _padding3: [0.0;3],
+            });
+
             vertices.append(&mut positions
                 .zip(normals)
                 .map(|(pos, normal)| Vertex {
@@ -250,19 +268,6 @@ pub async fn load_model_glb(
                     _padding2: 0.0,
                 })
                 .collect::<Vec<Vertex>>());
-
-            meshes.push(Mesh{
-                length: new_indices.len() as u32,
-                offset: indices.len() as u32 - 1,
-                _padding2: [0.0;2],
-                pos: [meshes.len() as f32 * 3.0, 0.0,0.0],
-                _padding: 0.0,
-                color: [0.2,0.2,1.0,1.0],
-                emission_color: [0.0;4],
-                emission_strength: 0.0,
-                _padding3: [0.0;3],
-            });
-
             indices.append(&mut new_indices);
         });
     }

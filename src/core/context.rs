@@ -2,6 +2,7 @@ use std::{mem, time::Duration, path::Path};
 
 use bytemuck::{Pod, Zeroable};
 use glam::{Vec3, Vec4};
+use gltf::json::extensions::mesh;
 use imgui_winit_support::winit::{self, event::{WindowEvent, KeyboardInput, ElementState, MouseButton }};
 use wgpu::util::DeviceExt;
 
@@ -43,9 +44,10 @@ struct Sphere{
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Default)]
 pub struct Mesh{
+    pub first: u32,
+    pub triangles: u32,
     pub offset: u32,
-    pub length: u32,
-    pub _padding2: [f32;2],
+    pub _padding2: f32,
     pub pos: [f32;3],
     pub _padding: f32,
     pub color: [f32;4],
@@ -76,11 +78,12 @@ impl Sphere{
 }
 
 impl Mesh{
-    pub fn new(pos: Vec3, offset: u32, length: u32,color: Vec4, emission_color: Vec4, emission_strength: f32)->Self{
+    pub fn new(pos: Vec3, first: u32, triangles: u32,offset: u32,color: Vec4, emission_color: Vec4, emission_strength: f32)->Self{
         Self{
+            first,
+            triangles,
             offset,
-            length,
-            _padding2: [0.0;2],
+            _padding2: 0.0,
             pos: pos.to_array(),
             _padding: 0.0,
             color: color.to_array(),
@@ -226,7 +229,7 @@ impl Context{
             height: config.height,
             number_of_bounces: 1,
             rays_per_pixel: 1,
-            toggle: 0,
+            toggle: 1,
         };
         let params_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("parameters buffer"),
@@ -324,7 +327,12 @@ impl Context{
             multiview: None,
         });
 
-        let camera = Camera::new(&device,Vec3::new(2.2,0.0,-3.7),Vec3::new(1.5,0.0,-3.0),Vec3::new(0.0,1.0,0.0),45.0,config.width as f32/config.height as f32,0.1,100.0);
+        let camera = Camera::new(&device,
+            Vec3::new(-2.764473, 5.8210998, 3.839141),
+            Vec3::new(-2.0999293, 5.1703076, 3.4719195),
+            Vec3::new(0.0,1.0,0.0),45.0,
+            config.width as f32/config.height as f32,0.1,100.0
+        );
 /*         let camera = Camera::new(&device,Vec3::new(-5.0,-10.0,0.0),Vec3::new(-2.0,-3.0,0.0),Vec3::new(0.0,1.0,0.0),45.0,config.width as f32/config.height as f32,0.1,100.0); */
 /*         let camera = Camera::new(&device,Vec3::new(-2.7,1.3,-8.0),Vec3::new(-2.6,1.0,-7.0),Vec3::new(0.0,1.0,0.0),28.0,config.width as f32/config.height as f32,0.1,100.0); */
         println!("{} {}",camera.pitch, camera.yaw);
@@ -364,26 +372,39 @@ impl Context{
             )
         ];
 
+        #[allow(unused_mut)]
         let mut vertices = vec![
-            Vertex::new(Vec3::new(2.0, 1.0, 1.0) * 10.0, Vec3::new(2.0,-3.0,-1.0)),
-            Vertex::new(Vec3::new(4.0, 1.0, 2.0) * 10.0, Vec3::new(4.0,-3.0, 0.0)),
-            Vertex::new(Vec3::new(3.0, 0.0, 4.0) * 10.0, Vec3::new(3.0,-4.0, 2.0)),
-            Vertex::new(Vec3::new(2.0, 1.0, 1.0), Vec3::new(2.0,-3.0,-1.0)),
-            Vertex::new(Vec3::new(4.0, 1.0, 2.0), Vec3::new(4.0,-3.0, 0.0)),
-            Vertex::new(Vec3::new(3.0, 0.0, 4.0), Vec3::new(3.0,-4.0, 2.0)),
+            Vertex::new(Vec3::new(0.0, 0.0, 1.0), Vec3::new(2.0,-3.0,-1.0)),
+            Vertex::new(Vec3::new(0.0, 0.15, 0.0), Vec3::new(4.0,-3.0, 0.0)),
+            Vertex::new(Vec3::new(1.0, 0.3, 0.0), Vec3::new(3.0,-4.0, 2.0)),
         ];
-        let mut indices = vec![0u32,1u32,2u32,3u32,4u32,5u32];
-
+        #[allow(unused_mut)]
+        let mut indices = vec![
+            2u32,1u32,0u32,
+            // 3u32,4u32,5u32
+        ];
+        #[allow(unused_mut)]
         let mut meshes = vec![
             Mesh::new(
                 Vec3::new(0.0,0.0,0.0),
-                0,2,
+                0, 1, 0,
                 Vec4::new(0.0,0.6,0.0,1.0),
                 Vec4::new(1.0,1.0,1.0,1.0), 0.0,
             ),
+            // Mesh::new(
+            //     Vec3::new(0.0,0.0,0.0),
+            //     3, 1, 6,
+            //     Vec4::new(0.6,0.1,0.1,1.0),
+            //     Vec4::new(1.0,1.0,1.0,1.0), 0.0,
+            // ),
         ];
-        for _ in 0..10{
-            load_model(Path::new("cube2.obj"), &mut vertices, &mut indices, &mut meshes).await.unwrap();
+
+        load_model(Path::new("cube2.obj"),&mut vertices, &mut indices, &mut meshes).await.unwrap();
+        load_model(Path::new("simple_cube.obj"),&mut vertices, &mut indices, &mut meshes).await.unwrap();
+        //load_model(Path::new("poly_sphere.obj"),&mut vertices, &mut indices, &mut meshes).await.unwrap();
+
+        for _ in 0..2{
+            //load_model(Path::new("cube2.obj"), &mut vertices, &mut indices, &mut meshes).await.unwrap();
         }
 
         let sphere_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
