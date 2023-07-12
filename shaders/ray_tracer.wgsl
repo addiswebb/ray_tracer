@@ -4,6 +4,7 @@ struct Params{
     number_of_bounces: i32,
     rays_per_pixel: i32,
     toggle: i32,
+    frames: i32,
 };
 struct Material{
     color: vec4<f32>,
@@ -35,7 +36,7 @@ var<uniform> params: Params;
 @group(0) @binding(1)
 var<uniform> camera: Camera;
 @group(0) @binding(2)
-var texture: texture_storage_2d<rgba32float,write>;
+var texture: texture_storage_2d<rgba32float,read_write>;
 @group(0) @binding(3)
 var<storage,read> spheres: array<Sphere>;
 @group(0) @binding(4)
@@ -49,9 +50,19 @@ var<storage,read> meshes: array<Mesh>;
 @workgroup_size(8,8)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     var i: FragInput;
+
     i.pos = vec2<f32>(f32(global_id.x),f32(global_id.y));
     i.size = vec2<f32>(f32(params.width),f32(params.height));
-    textureStore(texture, vec2<i32>(i32(i.pos.x), i32(i.pos.y)), frag(i));
+
+    let pos = vec2<i32>(i32(i.pos.x),i32(i.pos.y));
+    if(params.frames >= 1){
+        let weight = 1.0 / f32(params.frames + 1);
+        let prev_color = textureLoad(texture,pos);
+        let new_color = prev_color * vec4<f32>(1.0 - weight) + frag(i) * weight;
+        textureStore(texture, pos, new_color);
+    }else{
+        textureStore(texture, pos, frag(i));
+    }
 }
 
 struct Camera{
@@ -241,7 +252,7 @@ fn get_environment_light(ray: Ray) -> vec4<f32>{
 
 fn frag(i: FragInput) -> vec4<f32>{
     let pixel_coord = i.pos * i.size;
-    var rng_state = u32(pixel_coord.y * i.size.x + pixel_coord.x);
+    var rng_state = u32(pixel_coord.y * i.size.x + pixel_coord.x)+u32(abs(params.frames)) * 71939u;
 
     let pos = i.pos / i.size;
     var ray: Ray;

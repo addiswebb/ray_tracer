@@ -26,7 +26,9 @@ pub struct Params {
     height : u32,
     number_of_bounces: i32,
     rays_per_pixel: i32,
-    toggle: i32,
+    skybox: i32,
+    frames: i32,
+    accumulate: i32,
 }
 
 
@@ -229,7 +231,9 @@ impl Context{
             height: config.height,
             number_of_bounces: 1,
             rays_per_pixel: 1,
-            toggle: 1,
+            skybox: 1,
+            frames: 0,
+            accumulate: 1,
         };
         let params_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("parameters buffer"),
@@ -399,8 +403,7 @@ impl Context{
             // ),
         ];
 
-        load_model(Path::new("cube2.obj"),&mut vertices, &mut indices, &mut meshes).await.unwrap();
-        load_model(Path::new("simple_cube.obj"),&mut vertices, &mut indices, &mut meshes).await.unwrap();
+        load_model(Path::new("cube.obj"),&mut vertices, &mut indices, &mut meshes).await.unwrap();
         //load_model(Path::new("poly_sphere.obj"),&mut vertices, &mut indices, &mut meshes).await.unwrap();
 
         for _ in 0..2{
@@ -459,7 +462,7 @@ impl Context{
                 wgpu::BindGroupLayoutEntry {
                     binding: 2,
                     visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: texture.binding_type(wgpu::StorageTextureAccess::WriteOnly),
+                    ty: texture.binding_type(wgpu::StorageTextureAccess::ReadWrite),
                     count: None,
                 },
                 //Spheres
@@ -595,6 +598,7 @@ impl Context{
 
             self.params.width = size.width;
             self.params.height = size.height;
+            self.params.frames = -1;
 
             self.queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[self.params]));
             self.compute_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor{
@@ -654,7 +658,7 @@ impl Context{
         if io.want_capture_mouse || io.want_capture_keyboard {
             return false;
         } 
-        match event{
+        let moved = match event{
             WindowEvent::KeyboardInput { 
                 input: 
                     KeyboardInput{
@@ -677,12 +681,27 @@ impl Context{
                 true
             }
             _ => false,
+        };
+        match moved{
+            true => {
+                self.params.frames = -1;
+                //TODO remove these writes and rely on update for that
+                self.queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[self.params]));
+            },
+            _ => {},
         }
+
+        return moved;
     }
     pub fn update(&mut self, dt: Duration){
         self.dt = dt;
         self.camera.update_camera(self.dt);
         let uniform = self.camera.to_uniform();
+        if self.params.accumulate != 0{
+            self.params.frames +=1;
+        }else{
+            self.params.frames = -1;
+        }
         self.queue.write_buffer(&self.camera.buffer, 0, bytemuck::cast_slice(&[uniform]));
         self.queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[self.params]));
     }
@@ -726,7 +745,8 @@ impl Context{
             render_pass.set_vertex_buffer(0, self.tex_vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.tex_index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..6, 0, 0..1);
-            let mut toggle = self.params.toggle != 0;
+            let mut skybox = self.params.skybox != 0;
+            let mut accumulate = self.params.accumulate != 0;
             let ui = self.imgui_layer.context.frame();
             {
                 ui.window("Camera Info")
@@ -735,6 +755,9 @@ impl Context{
                         ui.text(format!(
                             "Frame time: ({:#?})",
                             1000.0 /self.dt.as_millis() as f32
+                        ));
+                        ui.text(format!(
+                            "Frame: {}",self.params.frames
                         ));
                         ui.text(format!(
                             "Position: ({})",
@@ -754,10 +777,12 @@ impl Context{
                         ));
                         ui.input_int("Bounces", &mut self.params.number_of_bounces).build();
                         ui.input_int("Rays per pixel", &mut self.params.rays_per_pixel).build();
-                        ui.checkbox("Skybox", &mut toggle);
+                        ui.checkbox("Skybox", &mut skybox);
+                        ui.checkbox("Accumulate", &mut accumulate);
                     });
             }
-            self.params.toggle = toggle as i32;
+            self.params.skybox = skybox as i32;
+            self.params.accumulate = accumulate as i32;
 
             self.imgui_layer
             .render(&self.device, &self.queue, &mut render_pass)
