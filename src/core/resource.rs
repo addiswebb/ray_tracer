@@ -1,5 +1,6 @@
 use std::{io::{BufReader, Cursor}, path::Path};
-use super::context::{Mesh, Vertex};
+
+use super::scene::{Vertex, Mesh};
 
 const FILE: &str = concat!(env!("CARGO_MANIFEST_DIR"));
 
@@ -79,7 +80,8 @@ pub async fn load_model_obj(
             color: [0.2,0.2,1.0,1.0],
             emission_color: [0.0;4],
             emission_strength: 0.0,
-            _padding3: [0.0;3],
+            specular: 0.5,
+            _padding3: [0.0;2],
         });
         vertices.append(&mut (0..m.mesh.positions.len() / 3)
             .map(|i| {
@@ -168,7 +170,8 @@ pub async fn load_model_gltf(
                     color: [0.2,0.2,1.0,1.0],
                     emission_color: [0.0;4],
                     emission_strength: 0.0,
-                    _padding3: [0.0;3],
+                    specular: 0.5,
+                    _padding3: [0.0;2],
                 });
 
                 vertices.append(&mut positions
@@ -256,7 +259,8 @@ pub async fn load_model_glb(
                 color: [0.2,0.2,1.0,1.0],
                 emission_color: [0.0;4],
                 emission_strength: 0.0,
-                _padding3: [0.0;3],
+                specular: 0.5,
+                _padding3: [0.0;2],
             });
 
             vertices.append(&mut positions

@@ -23,7 +23,7 @@ pub async fn run(){
     window.event_loop.run(move |event, _, control_flow| {
         match event{
             Event::DeviceEvent { event: DeviceEvent::MouseMotion{delta,}, ..  } => if context.mouse_pressed{
-                context.camera.controller.process_mouse(delta.0, delta.1)
+                context.scene.camera.controller.process_mouse(delta.0, delta.1)
             }
             Event::MainEventsCleared => window.raw.request_redraw(),
             Event::WindowEvent{ ref event, window_id, } if window_id == window.raw.id() => 
@@ -62,6 +62,6 @@ pub async fn run(){
             }
             _ => (),
         }
-        context.imgui_layer.event(&window.raw,&event);
+        context.renderer.imgui_layer.event(&window.raw,&event);
     });
 }

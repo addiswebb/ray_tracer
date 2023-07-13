@@ -4,3 +4,6 @@ pub mod imgui;
 pub mod texture;
 pub mod camera;
 pub mod resource;
+pub mod renderer;
+pub mod ray_tracer;
+pub mod scene;
