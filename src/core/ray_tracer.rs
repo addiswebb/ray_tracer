@@ -55,7 +55,7 @@ impl RayTracer{
                     ty: wgpu::BindingType::Buffer{
                         ty: wgpu::BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: wgpu::BufferSize::new((mem::size_of::<Sphere>() * scene.spheres.0.len()) as _),
+                        min_binding_size: wgpu::BufferSize::new((mem::size_of::<Sphere>() * scene.spheres.len()) as _),
                     },
                     count: None,
                 },
@@ -66,7 +66,7 @@ impl RayTracer{
                     ty: wgpu::BindingType::Buffer{
                         ty: wgpu::BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: wgpu::BufferSize::new((mem::size_of::<Vertex>() * scene.vertices.0.len()) as _),
+                        min_binding_size: wgpu::BufferSize::new((mem::size_of::<Vertex>() * scene.vertices.len()) as _),
                     },
                     count: None,
                 },
@@ -77,7 +77,7 @@ impl RayTracer{
                     ty: wgpu::BindingType::Buffer{
                         ty: wgpu::BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: wgpu::BufferSize::new((mem::size_of::<u32>() * scene.indices.0.len()) as _),
+                        min_binding_size: wgpu::BufferSize::new((mem::size_of::<u32>() * scene.indices.len()) as _),
                     },
                     count: None,
                 },
@@ -88,7 +88,7 @@ impl RayTracer{
                     ty: wgpu::BindingType::Buffer{
                         ty: wgpu::BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
-                        min_binding_size: wgpu::BufferSize::new((mem::size_of::<Mesh>() * scene.meshes.0.len()) as _),
+                        min_binding_size: wgpu::BufferSize::new((mem::size_of::<Mesh>() * scene.meshes.len()) as _),
                     },
                     count: None,
                 },
@@ -110,21 +110,21 @@ impl RayTracer{
                     binding: 2,
                     resource: texture.binding_resource(),
                 },
-                wgpu::BindGroupEntry{
+                wgpu::BindGroupEntry {
                     binding: 3,
-                    resource: scene.spheres.1.as_entire_binding(),
+                    resource: scene.sphere_buffer(device).as_entire_binding(),
                 },
-                wgpu::BindGroupEntry{
+                wgpu::BindGroupEntry {
                     binding: 4,
-                    resource: scene.vertices.1.as_entire_binding(),
+                    resource: scene.vertex_buffer(device).as_entire_binding(),
                 },
-                wgpu::BindGroupEntry{
+                wgpu::BindGroupEntry {
                     binding: 5,
-                    resource: scene.indices.1.as_entire_binding(),
+                    resource: scene.index_buffer(device).as_entire_binding(),
                 },
-                wgpu::BindGroupEntry{
+                wgpu::BindGroupEntry {
                     binding: 6,
-                    resource: scene.meshes.1.as_entire_binding(),
+                    resource: scene.mesh_buffer(device).as_entire_binding(),
                 },
             ],
         });
@@ -145,5 +145,41 @@ impl RayTracer{
             bind_group,
             bind_group_layout,
         }
+    }
+    pub fn update_bind_group(&mut self, device: &wgpu::Device, params_buffer: &wgpu::Buffer, texture: &Texture,scene: &Scene){
+        self.bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor{
+            label: Some("Compute Bind Group"),
+            layout: &self.bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: params_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: scene.camera.buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: texture.binding_resource(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: scene.sphere_buffer(&device).as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: scene.vertex_buffer(&device).as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: scene.index_buffer(&device).as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: scene.mesh_buffer(&device).as_entire_binding(),
+                },
+            ],
+        });
     }
 }

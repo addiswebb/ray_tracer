@@ -10,7 +10,7 @@ struct Material{
     color: vec4<f32>,
     emission_color: vec4<f32>,
     emission_strength: f32,
-    specular: f32,
+    smoothness: f32,
 }
 
 struct Sphere{
@@ -222,7 +222,6 @@ fn trace(ray: Ray, seed: ptr<function, u32>) -> vec4<f32>{
     var ray: Ray = ray;
     var ray_color = vec4<f32>(1.0);
     var incoming_light = vec4<f32>(0.0);
-    var color = vec4<f32>(0.0);
     for (var i = 0; i <= params.number_of_bounces; i +=1){
         var hit = calculate_ray_collions(ray);
         if (hit.hit){
@@ -230,13 +229,13 @@ fn trace(ray: Ray, seed: ptr<function, u32>) -> vec4<f32>{
             let diffuse_dir = normalize(hit.normal + rand_unit_sphere(seed));
             let specular_dir = reflect(ray.dir, hit.normal);
 
-            ray.dir = mix(diffuse_dir,specular_dir,hit.material.specular);
+            ray.dir = mix(diffuse_dir,specular_dir,hit.material.smoothness);
             
             let emitted_light = hit.material.emission_color * hit.material.emission_strength;
-            let light_stength = dot(hit.normal, ray.dir);
+            //let light_stength = dot(hit.normal, ray.dir);
             incoming_light += emitted_light * ray_color;
             ray_color *= hit.material.color;
-            color = hit.material.color * light_stength * 2.0;
+            //* light_stength * 2.0;
         }else{
             if(params.toggle != 0){
                 incoming_light += get_environment_light(ray) * ray_color;

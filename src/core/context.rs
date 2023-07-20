@@ -84,7 +84,7 @@ impl Context{
         let params = Params {
             width: config.width,
             height: config.height,
-            number_of_bounces: 1,
+            number_of_bounces: 3,
             rays_per_pixel: 1,
             skybox: 1,
             frames: 0,
@@ -100,7 +100,7 @@ impl Context{
 
         let renderer = Renderer::new(&device,&queue,&texture,&config,&params_buffer,window.as_ref()).await;
 
-        let scene = Scene::new(&device, &config).await;
+        let scene = Scene::room(&device, &config).await;
 
         let ray_tracer = RayTracer::new(&device,&texture, &params_buffer, &scene);
 
@@ -132,55 +132,8 @@ impl Context{
             self.params.frames = -1;
 
             self.queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[self.params]));
-            self.ray_tracer.bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor{
-                label: Some("Compute Bind Group"),
-                layout: &self.ray_tracer.bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: self.params_buffer.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: self.scene.camera.buffer.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: self.texture.binding_resource(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 3,
-                        resource: self.scene.spheres.1.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 4,
-                        resource: self.scene.vertices.1.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 5,
-                        resource: self.scene.indices.1.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 6,
-                        resource: self.scene.meshes.1.as_entire_binding(),
-                    },
-                ],
-            });
-
-            self.renderer.bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &self.renderer.bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry{
-                        binding: 0,
-                        resource: self.params_buffer.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: self.texture.binding_resource(),
-                    },
-                ],
-                label: Some("Bind Group"),
-            });
+            self.ray_tracer.update_bind_group(&self.device,&self.params_buffer, &self.texture,&self.scene);
+            self.renderer.update_bind_group(&self.device, &self.params_buffer, &self.texture);
         }
     }
 

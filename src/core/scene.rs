@@ -15,7 +15,7 @@ pub struct Sphere{
     color: [f32;4],
     emission_color: [f32;4],
     emission_strength: f32,
-    specular: f32,
+    smoothness: f32,
     _padding: [f32;2],
 }
 
@@ -52,7 +52,7 @@ impl Sphere{
             emission_color: emission_color.to_array(),
             emission_strength,
             _padding: [0.0;2],
-            specular: if specular < 1.0 {specular} else{1.0},
+            smoothness: if specular < 1.0 {specular} else{1.0},
         }
     }
 }
@@ -92,14 +92,140 @@ impl Vertex{
 
 pub struct Scene{
     pub camera: Camera,
-    pub spheres: (Vec<Sphere>,wgpu::Buffer),
-    pub vertices: (Vec<Vertex>,wgpu::Buffer),
-    pub indices: (Vec<u32>, wgpu::Buffer),
-    pub meshes: (Vec<Mesh>,wgpu::Buffer),
+    pub spheres: Vec<Sphere>,
+    pub vertices: Vec<Vertex>,
+    pub indices: Vec<u32>, 
+    pub meshes: Vec<Mesh>,
 }
 
 impl Scene{
-    pub async fn new(device: &wgpu::Device,config: &wgpu::SurfaceConfiguration)->Self{
+    pub fn new(device: &wgpu::Device,config: &wgpu::SurfaceConfiguration)->Self{
+        let camera = Camera::new(&device,
+            Vec3::new(-2.764473, 5.8210998, 3.839141),
+            Vec3::new(-2.0999293, 5.1703076, 3.4719195),
+            Vec3::new(0.0,1.0,0.0),45.0,
+            config.width as f32/config.height as f32,0.1,100.0
+        );
+        Self{
+            camera,
+            spheres: vec![],
+            vertices: vec![],
+            indices: vec![],
+            meshes: vec![],
+        }
+    }
+    pub async fn room(device: &wgpu::Device,config: &wgpu::SurfaceConfiguration)->Self{
+        let camera = Camera::new(&device,
+            Vec3::new(-7.0,0.0,0.0),
+            Vec3::new(1.0,0.0,0.0),
+            Vec3::new(0.0,1.0,0.0),45.0,
+            config.width as f32/config.height as f32,0.1,100.0
+        );
+
+        let spheres = vec![
+            Sphere::new(
+                Vec3::new(4.0,0.0,1.7),1.2, 
+                Vec4::new(1.0,1.0,1.0,1.0),
+                Vec4::new(0.0,0.0,0.0,1.0),0.0,
+                1.0
+            ),
+            Sphere::new(
+                Vec3::new(4.0,0.0,-1.7),1.2, 
+                Vec4::new(1.0,1.0,1.0,1.0),
+                Vec4::new(0.0,0.0,0.0,1.0),0.0,
+                0.5
+            ),
+        ];
+
+        #[allow(unused_mut)]
+        let mut vertices = vec![
+            Vertex::new(Vec3::new(3.0,-3.0,-3.0), Vec3::new(2.0,-3.0,-3.0)),
+            Vertex::new(Vec3::new(3.0,-3.0, 3.0), Vec3::new(4.0,-3.0, 0.0)),
+            Vertex::new(Vec3::new(-3.0,-3.0,3.0), Vec3::new(3.0,-4.0, 2.0)),
+            Vertex::new(Vec3::new(-3.0,-3.0,-3.0), Vec3::new(3.0,-4.0, 2.0)),
+            Vertex::new(Vec3::new(3.0,3.0,-3.0), Vec3::new(3.0,-4.0, 2.0)),
+            Vertex::new(Vec3::new(3.0,3.0,3.0), Vec3::new(3.0,-4.0, 2.0)),
+            Vertex::new(Vec3::new(-3.0,3.0,3.0), Vec3::new(3.0,-4.0, 2.0)),
+            Vertex::new(Vec3::new(-3.0,3.0,-3.0), Vec3::new(3.0,-4.0, 2.0)),
+
+            Vertex::new(Vec3::new(1.0,1.0,-1.0), Vec3::new(3.0,-4.0, 2.0)),
+            Vertex::new(Vec3::new(1.0,1.0,1.0), Vec3::new(3.0,-4.0, 2.0)),
+            Vertex::new(Vec3::new(-1.0,1.0,1.0), Vec3::new(3.0,-4.0, 2.0)),
+            Vertex::new(Vec3::new(-1.0,1.0,-1.0), Vec3::new(3.0,-4.0, 2.0)),
+        ];
+        #[allow(unused_mut)]
+        let mut indices = vec![
+            3u32, 2u32, 1u32,
+            3u32, 1u32, 0u32,
+            7u32, 0u32, 4u32,
+            7u32, 3u32, 0u32,
+            7u32, 6u32, 2u32,
+            7u32, 2u32, 3u32,
+            2u32, 6u32, 5u32,
+            2u32, 5u32, 1u32,
+            1u32, 5u32, 4u32,
+            1u32, 4u32, 0u32,
+            5u32, 6u32, 7u32,
+            5u32, 7u32, 4u32,
+
+            9u32, 10u32, 11u32,
+            9u32, 11u32, 8u32,
+        ];
+        #[allow(unused_mut)]
+        let mut meshes = vec![
+            Mesh::new(
+                Vec3::new(3.0,0.0,0.0),
+                0, 2, 0,
+                Vec4::new(1.0,0.0,0.0,1.0),
+                Vec4::new(1.0,1.0,1.0,1.0), 0.0, 0.5,
+            ),
+            Mesh::new(
+                Vec3::new(3.0,0.0,0.0),
+                6, 2, 0,
+                Vec4::new(0.0,1.0,0.0,1.0),
+                Vec4::new(1.0,1.0,1.0,1.0), 0.0, 0.5,
+            ),
+            Mesh::new(
+                Vec3::new(3.0,0.0,0.0),
+                12, 2, 0,
+                Vec4::new(0.0,0.0,1.0,1.0),
+                Vec4::new(1.0,1.0,1.0,1.0), 0.0, 0.5,
+            ),
+            Mesh::new(
+                Vec3::new(3.0,0.0,0.0),
+                18, 2, 0,
+                Vec4::new(0.5,0.5,0.0,1.0),
+                Vec4::new(1.0,1.0,1.0,1.0), 0.0, 0.5,
+            ),
+            Mesh::new(
+                Vec3::new(3.0,0.0,0.0),
+                24, 2, 0,
+                Vec4::new(0.0,0.5,0.5,1.0),
+                Vec4::new(1.0,1.0,1.0,1.0), 0.0, 0.5,
+            ),
+            Mesh::new(
+                Vec3::new(3.0,0.0,0.0),
+                30, 2, 0,
+                Vec4::new(1.0,1.0,1.0,1.0),
+                Vec4::new(1.0,1.0,1.0,1.0), 0.0, 0.5,
+            ),
+            Mesh::new(
+                Vec3::new(3.0,1.9,0.0),
+                36, 2, 0,
+                Vec4::new(1.0,1.0,1.0,1.0),
+                Vec4::new(1.0,1.0,1.0,1.0), 0.6, 0.0,
+            ),
+        ];
+
+        Self{
+            camera,
+            spheres,
+            vertices,
+            indices,
+            meshes,
+        }
+    }
+    pub async fn balls(device: &wgpu::Device,config: &wgpu::SurfaceConfiguration)->Self{
         let camera = Camera::new(&device,
             Vec3::new(-2.764473, 5.8210998, 3.839141),
             Vec3::new(-2.0999293, 5.1703076, 3.4719195),
@@ -112,9 +238,10 @@ impl Scene{
 
         let spheres = vec![
             Sphere::new(
-                Vec3::new(-3.64,-0.72,0.8028),0.75, 
+                Vec3::new(-3.64,-0.42,0.8028),0.75, 
                 Vec4::new(1.0,1.0,1.0,1.0),
-                Vec4::new(0.0,0.0,0.0,1.0),0.0,0.0
+                Vec4::new(0.0,0.0,0.0,1.0),0.0,
+                0.7
             ),
             Sphere::new(
                 Vec3::new(-2.54,-0.72,0.5),0.6, 
@@ -126,7 +253,7 @@ impl Scene{
                 Vec3::new(-1.27,-0.72,1.0),0.5, 
                 Vec4::new(0.0,1.0,0.0,1.0),
                 Vec4::new(1.0,1.0,1.0,1.0), 0.0,
-                1.0
+                0.2
             ),
             Sphere::new(
                 Vec3::new(-0.5,-0.9,1.55),0.35,
@@ -170,37 +297,45 @@ impl Scene{
             ),
         ];
 
-        load_model(Path::new("cube.glb"),&mut vertices, &mut indices, &mut meshes).await.unwrap();
+        load_model(Path::new("cube2.obj"),&mut vertices, &mut indices, &mut meshes).await.unwrap();
 
-        let sphere_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
-            label: Some("Sphere Buffer"),
-            contents: bytemuck::cast_slice(&spheres),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST| wgpu::BufferUsages::STORAGE,
-        }); 
-
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(&vertices),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST| wgpu::BufferUsages::STORAGE,
-        }); 
-
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
-            label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(&indices),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST| wgpu::BufferUsages::STORAGE,
-        }); 
-        let mesh_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
-            label: Some("Mesh Buffer"),
-            contents: bytemuck::cast_slice(&meshes),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST| wgpu::BufferUsages::STORAGE,
-        }); 
 
         Self{
             camera,
-            spheres: (spheres,sphere_buffer),
-            vertices: (vertices,vertex_buffer),
-            indices: (indices,index_buffer),
-            meshes: (meshes, mesh_buffer)
+            spheres,
+            vertices,
+            indices,
+            meshes,
         }
+    }
+    pub fn sphere_buffer(&self, device: &wgpu::Device)->wgpu::Buffer{
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
+            label: Some("Sphere Buffer"),
+            contents: bytemuck::cast_slice(&self.spheres),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST| wgpu::BufferUsages::STORAGE,
+        })
+    }
+    pub fn vertex_buffer(&self, device: &wgpu::Device)->wgpu::Buffer{
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(&self.vertices),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST| wgpu::BufferUsages::STORAGE,
+        })
+    }
+
+    pub fn index_buffer(&self, device: &wgpu::Device)->wgpu::Buffer{
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
+            label: Some("Index Buffer"),
+            contents: bytemuck::cast_slice(&self.indices),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST| wgpu::BufferUsages::STORAGE,
+        })
+    }
+
+    pub fn mesh_buffer(&self, device: &wgpu::Device)->wgpu::Buffer{
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
+            label: Some("Mesh Buffer"),
+            contents: bytemuck::cast_slice(&self.meshes),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST| wgpu::BufferUsages::STORAGE,
+        })
     }
 }

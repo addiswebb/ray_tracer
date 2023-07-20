@@ -165,4 +165,21 @@ impl Renderer{
             dt, 
         }
     }
+
+    pub fn update_bind_group(&mut self, device: &wgpu::Device, params_buffer: &wgpu::Buffer, texture: &Texture){
+        self.bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &self.bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry{
+                    binding: 0,
+                    resource: params_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: texture.binding_resource(),
+                },
+            ],
+            label: Some("Bind Group"),
+        });
+    }
 }
