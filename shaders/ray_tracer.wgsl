@@ -219,17 +219,14 @@ fn trace(ray: Ray, seed: ptr<function, u32>) -> vec4<f32>{
             ray.origin = hit.hit_point;
             let unit_dir = normalize(ray.dir);
             //TODO look into different random hemisphere generators
-            if(hit.material.smoothness != -1.0){
-                var diffuse_dir = rand_hemisphere_dir_dist(hit.normal, seed);
-                let specular_dir = reflect(unit_dir, hit.normal);
-                ray.dir = mix(diffuse_dir,specular_dir,hit.material.smoothness);
-            }else{
+            if(hit.material.smoothness == -1.0){
                 var front_face = false;
                 if(dot(ray.dir, hit.normal) > 0.0){
                     front_face = false;
                 }else{
                     front_face = true;
                 }
+                //TODO get refraction_ratio from material 
                 var refraction_ratio = 1.5;
                 if(front_face){
                     refraction_ratio = 1.0/1.5;
@@ -245,6 +242,10 @@ fn trace(ray: Ray, seed: ptr<function, u32>) -> vec4<f32>{
                 }else{
                     ray.dir = refract(unit_dir,hit.normal,refraction_ratio);
                 }
+            }else{
+                var diffuse_dir = rand_hemisphere_dir_dist(hit.normal, seed);
+                let specular_dir = reflect(unit_dir, hit.normal);
+                ray.dir = mix(diffuse_dir,specular_dir,hit.material.smoothness);
             }
             
             let emitted_light = hit.material.emission_color * hit.material.emission_strength;
