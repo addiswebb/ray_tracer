@@ -45,6 +45,9 @@ pub async fn run(){
                         },
                         _ => {}
                     }
+                }else{
+                    //Todo use camera controller to clear acculumation
+                    context.clear_accululation();
                 }
             Event::RedrawRequested(window_id) if window_id == window.raw.id() => {
                 let now = Instant::now();

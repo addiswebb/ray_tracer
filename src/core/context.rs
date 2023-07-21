@@ -100,7 +100,7 @@ impl Context{
 
         let renderer = Renderer::new(&device,&queue,&texture,&config,&params_buffer,window.as_ref()).await;
 
-        let scene = Scene::room(&device, &config).await;
+        let scene = Scene::balls(&device, &config).await;
 
         let ray_tracer = RayTracer::new(&device,&texture, &params_buffer, &scene);
 
@@ -136,13 +136,18 @@ impl Context{
             self.renderer.update_bind_group(&self.device, &self.params_buffer, &self.texture);
         }
     }
+    pub fn clear_accululation(&mut self){
+        self.params.frames = -1;
+        self.queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[self.params]));
+    }
 
     pub fn input(&mut self, event: &WindowEvent) -> bool {
+        self.clear_accululation();
         let io = self.renderer.imgui_layer.context.io();
         if io.want_capture_mouse || io.want_capture_keyboard {
             return false;
         } 
-        let moved = match event{
+        match event{
             WindowEvent::KeyboardInput { 
                 input: 
                     KeyboardInput{
@@ -152,10 +157,7 @@ impl Context{
                     }, 
                 ..
             } => self.scene.camera.controller.process_keyboard(*key, *state),
-            WindowEvent::MouseWheel { delta, .. } => {
-                self.scene.camera.controller.process_scroll(delta);
-                true
-            }
+            WindowEvent::MouseWheel { delta, .. } => self.scene.camera.controller.process_scroll(delta),
             WindowEvent::MouseInput { 
                 button: MouseButton::Left, 
                 state,
@@ -165,17 +167,7 @@ impl Context{
                 true
             }
             _ => false,
-        };
-        match moved{
-            true => {
-                self.params.frames = -1;
-                //TODO remove these writes and rely on update for that
-                self.queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[self.params]));
-            },
-            _ => {},
         }
-
-        return moved;
     }
     pub fn update(&mut self, dt: Duration){
         self.renderer.dt = dt;

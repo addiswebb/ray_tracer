@@ -176,16 +176,7 @@ fn calculate_ray_collions(ray: Ray) -> Hit{
             }
         }
     }
-    // for(var mesh_index: u32 = 0u; mesh_index < arrayLength(&meshes); mesh_index+=1u){
-    //     for(var i: u32 = 0u; i < meshes[mesh_index].triangles; i+=1u){
-    //         let tri_index = meshes[mesh_index].first + i;
-    //         var hit: Hit = ray_triangle(ray, triangles[tri_index]);
-    //         if hit.hit && hit.dst < closest_hit.dst{
-    //             closest_hit = hit;
-    //             closest_hit.material = meshes[mesh_index].material;
-    //         }
-    //     }
-    // }
+
     return closest_hit;
 }
 
@@ -226,7 +217,8 @@ fn trace(ray: Ray, seed: ptr<function, u32>) -> vec4<f32>{
         var hit = calculate_ray_collions(ray);
         if (hit.hit){
             ray.origin = hit.hit_point;
-            let diffuse_dir = normalize(hit.normal + rand_unit_sphere(seed));
+            //TODO look into different random hemisphere generators
+            var diffuse_dir = rand_hemisphere_dir_dist(hit.normal, seed);
             let specular_dir = reflect(ray.dir, hit.normal);
 
             ray.dir = mix(diffuse_dir,specular_dir,hit.material.smoothness);

@@ -201,7 +201,7 @@ impl CameraController{
         self.rotate_vertical = mouse_dy as f32 * 3.0;
     }
 
-    pub fn process_scroll(&mut self, delta: &MouseScrollDelta){
+    pub fn process_scroll(&mut self, delta: &MouseScrollDelta) -> bool {
         self.scroll = -match delta{
             MouseScrollDelta::LineDelta(_, scroll) => scroll * 10000.0,
             MouseScrollDelta::PixelDelta(PhysicalPosition{
@@ -209,6 +209,7 @@ impl CameraController{
                 ..
             }) => *scroll as f32,
         };
+        return true;
     }
 
      
