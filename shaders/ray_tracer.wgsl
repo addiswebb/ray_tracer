@@ -96,7 +96,7 @@ struct Hit{
 const SKY_HORIZON: vec4<f32> = vec4<f32>(1.0,1.0,1.0,0.0);
 const SKY_ZENITH: vec4<f32> = vec4<f32>(0.0788092, 0.36480793, 0.7264151, 0.0);
 const GROUND_COLOR: vec4<f32> = vec4<f32>(0.35,0.3,0.35, 0.0);
-const SUN_INTENSITY: f32 = 0.6;
+const SUN_INTENSITY: f32 = 0.1;
 const SUN_FOCUS: f32 = 500.0;
 
 fn ray_sphere(ray: Ray, pos: vec3<f32>, radius: f32) -> Hit{
@@ -217,10 +217,35 @@ fn trace(ray: Ray, seed: ptr<function, u32>) -> vec4<f32>{
         var hit = calculate_ray_collions(ray);
         if (hit.hit){
             ray.origin = hit.hit_point;
+            let unit_dir = normalize(ray.dir);
             //TODO look into different random hemisphere generators
-            var diffuse_dir = rand_hemisphere_dir_dist(hit.normal, seed);
-            let specular_dir = reflect(normalize(ray.dir), hit.normal);
-            ray.dir = mix(diffuse_dir,specular_dir,hit.material.smoothness);
+            if(hit.material.smoothness != -1.0){
+                var diffuse_dir = rand_hemisphere_dir_dist(hit.normal, seed);
+                let specular_dir = reflect(unit_dir, hit.normal);
+                ray.dir = mix(diffuse_dir,specular_dir,hit.material.smoothness);
+            }else{
+                var front_face = false;
+                if(dot(ray.dir, hit.normal) > 0.0){
+                    front_face = false;
+                }else{
+                    front_face = true;
+                }
+                var refraction_ratio = 1.5;
+                if(front_face){
+                    refraction_ratio = 1.0/1.5;
+                }
+                
+                let cos_theta = min(dot(-unit_dir, hit.normal),1.0);
+                let sin_theta = sqrt(1.0 - cos_theta*cos_theta);
+
+                let cannot_refract = refraction_ratio * sin_theta > 1.0;
+
+                if(cannot_refract || reflectance(cos_theta,refraction_ratio)> rand(seed)){
+                    ray.dir = reflect(unit_dir, hit.normal);
+                }else{
+                    ray.dir = refract(unit_dir,hit.normal,refraction_ratio);
+                }
+            }
             
             let emitted_light = hit.material.emission_color * hit.material.emission_strength;
             incoming_light += emitted_light * ray_color;
@@ -233,6 +258,19 @@ fn trace(ray: Ray, seed: ptr<function, u32>) -> vec4<f32>{
         }
     }
     return incoming_light;
+}
+
+fn reflectance(cosine: f32, refraction_ratio: f32) -> f32{
+    var r0 = (1.0 - refraction_ratio) / (1.0 + refraction_ratio);
+    r0 = r0 * r0;
+    return r0 + (1.0 - r0) * pow((1.0-cosine),5.0);
+}
+
+fn refract(uv: vec3<f32>, normal: vec3<f32>, refraction_ratio: f32) -> vec3<f32>{
+    let cos_theta = min(dot(-uv, normal),1.0);
+    let r_out_perp = refraction_ratio * (uv + cos_theta * normal);
+    let r_out_parallel = -sqrt(abs(1.0 - length(r_out_perp))) * normal;
+    return r_out_perp + r_out_parallel;
 }
 
 fn get_environment_light(ray: Ray) -> vec4<f32>{
