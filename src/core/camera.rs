@@ -20,8 +20,15 @@ pub struct CameraUniform{
     pub near: f32,
     pub far: f32,
     _padding5: [f32;2],
+    pub w: [f32;3],
+    _padding6: f32,
+    pub u: [f32;3],
+    _padding7: f32,
+    pub v: [f32;3],
+    pub lens_radius: f32,
 }
 
+#[derive(Debug)]
 pub struct Camera{
     pub origin: Vec3,
     pub yaw: f32,
@@ -32,11 +39,14 @@ pub struct Camera{
     pub aspect: f32,
     pub near: f32,
     pub far: f32,
+    pub aperture: f32,
+    pub focus_dist: f32,
+    pub lens_radius: f32,
     pub buffer: wgpu::Buffer,
     pub controller: CameraController,
 }
 impl Camera{
-    pub fn new(device: &wgpu::Device, origin: Vec3, look_at: Vec3, view_up: Vec3, fov: f32, aspect: f32, near: f32, far: f32) -> Self {
+    pub fn new(device: &wgpu::Device, origin: Vec3, look_at: Vec3, view_up: Vec3, fov: f32, aspect: f32, near: f32, far: f32, aperture: f32, focus_dist: f32,) -> Self {
         let uniform = CameraUniform::default();
         
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
@@ -59,20 +69,35 @@ impl Camera{
             aspect,
             near,
             far,
+            aperture,
+            lens_radius: aperture /2.0,
+            focus_dist,
             buffer,
             controller,
         }
     }
     pub fn to_uniform(&mut self) -> CameraUniform{
-        let theta = radians(self.fov); 
-        let half_height = self.near * f32::tan(theta/ 2.0);
-        let half_width = self.aspect * half_height;
+        // let theta = radians(self.fov); 
+        // let half_height = self.near * f32::tan(theta/ 2.0);
+        // let half_width = self.aspect * half_height;
+        // let w = (self.origin - self.look_at).normalize();
+        // let u = self.view_up.cross(w).normalize();
+        // let v = w.cross(u);
+        // let horizontal = 2.0 * half_width * u;
+        // let vertical = 2.0 * half_height * v;
+        // let lower_left_corner = self.origin - half_width * u - half_height * v - self.near * w;
+
+        let theta = radians(self.fov);
+        let height = 2.0 * f32::tan(theta/2.0);
+        let width = self.aspect * height;
         let w = (self.origin - self.look_at).normalize();
         let u = self.view_up.cross(w).normalize();
         let v = w.cross(u);
-        let horizontal = 2.0 * half_width * u;
-        let vertical = 2.0 * half_height * v;
-        let lower_left_corner = self.origin - half_width * u - half_height * v - self.near * w;
+
+        let horizontal = self.focus_dist * width * u;
+        let vertical = self.focus_dist * height * v;
+        let lower_left_corner = self.origin - horizontal/2.0 - vertical/2.0 - self.focus_dist * w;
+        //TODO add lens_radius = aperture / 2.0
 
         CameraUniform {
             origin: self.origin.to_array(),
@@ -86,6 +111,12 @@ impl Camera{
             near: self.near, 
             far: self.far,
             _padding5: [0.0;2],
+            w: w.to_array(),
+            _padding6: 0.0,
+            u: u.to_array(),
+            _padding7: 0.0,
+            v: v.to_array(),
+            lens_radius: self.aperture/2.0,
         }
     }
     pub fn update_camera(&mut self, dt: Duration) {

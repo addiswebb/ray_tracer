@@ -100,7 +100,7 @@ impl Context{
 
         let renderer = Renderer::new(&device,&queue,&texture,&config,&params_buffer,window.as_ref()).await;
 
-        let scene = Scene::metal(&device, &config).await;
+        let scene = Scene::random_balls(&device, &config).await;
 
         let ray_tracer = RayTracer::new(&device,&texture, &params_buffer, &scene);
 
@@ -247,6 +247,8 @@ impl Context{
                         ui.input_int("Rays per pixel", &mut self.params.rays_per_pixel).build();
                         ui.checkbox("Skybox", &mut skybox);
                         ui.checkbox("Accumulate", &mut accumulate);
+                        ui.slider("Focus distance", 0.0, 10.0, &mut self.scene.camera.focus_dist);
+                        ui.slider("Aperture", -2.0, 2.0, &mut self.scene.camera.aperture);
                     });
             }
             self.params.skybox = skybox as i32;

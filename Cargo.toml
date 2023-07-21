@@ -19,3 +19,4 @@ anyhow = "1.0.70"
 bytemuck = {version = "1.13.1", features = ["derive"]}
 tobj = {version = "3.2.5", features =["async"]}
 gltf = "1.1.0"
+rand = "0.8.5"

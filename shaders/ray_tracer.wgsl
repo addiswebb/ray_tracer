@@ -73,6 +73,10 @@ struct Camera{
     vertical: vec3<f32>,
     near: f32,
     far: f32,
+    w: vec3<f32>,
+    u: vec3<f32>,
+    v: vec3<f32>,
+    lens_radius: f32,
 }
 
 struct FragInput{
@@ -209,6 +213,19 @@ fn rand_hemisphere_dir_dist(normal: vec3<f32>, seed: ptr<function, u32>) -> vec3
     return dir * sign(dot(normal, dir));
 }
 
+fn rand_in_unit_disk(seed: ptr<function, u32>)-> vec3<f32>{
+    for(var i = 0; i < 1000; i+=1){
+        let r1 = (rand(seed)*2.0);
+        let r2 = (rand(seed)*2.0);
+        let p = vec3<f32>(r1, r2, 1.0) - 1.0;
+        if(length(p) <= 1.0){
+            return p;
+        }
+        i -=1;
+    }
+    return vec3<f32>(0.0,0.0,0.0);
+}
+
 fn trace(ray: Ray, seed: ptr<function, u32>) -> vec4<f32>{
     var ray: Ray = ray;
     var ray_color = vec4<f32>(1.0);
@@ -219,7 +236,10 @@ fn trace(ray: Ray, seed: ptr<function, u32>) -> vec4<f32>{
             ray.origin = hit.hit_point;
             let unit_dir = normalize(ray.dir);
             //TODO look into different random hemisphere generators
+            //-1.0 is for glass
             if(hit.material.smoothness == -1.0){
+                hit.material.color = vec4<f32>(1.0);
+
                 var front_face = false;
                 if(dot(ray.dir, hit.normal) > 0.0){
                     front_face = false;
@@ -237,12 +257,12 @@ fn trace(ray: Ray, seed: ptr<function, u32>) -> vec4<f32>{
 
                 let cannot_refract = refraction_ratio * sin_theta > 1.0;
 
-                if(cannot_refract || reflectance(cos_theta,refraction_ratio)> rand(seed)){
+                if(cannot_refract || reflectance(cos_theta,refraction_ratio) > rand(seed)){
                     ray.dir = reflect(unit_dir, hit.normal);
                 }else{
                     ray.dir = refract(unit_dir,hit.normal,refraction_ratio);
                 }
-            }else{
+            } else{
                 var diffuse_dir = rand_hemisphere_dir_dist(hit.normal, seed);
                 let specular_dir = reflect(unit_dir, hit.normal);
                 ray.dir = mix(diffuse_dir,specular_dir,hit.material.smoothness);
@@ -253,8 +273,8 @@ fn trace(ray: Ray, seed: ptr<function, u32>) -> vec4<f32>{
             ray_color *= hit.material.color;
         }else{
             if(params.toggle != 0){
-                incoming_light += get_environment_light(ray) * ray_color;
             }
+            incoming_light += get_environment_light(ray) * ray_color;
             break;
         }
     }
@@ -292,9 +312,13 @@ fn frag(i: FragInput) -> vec4<f32>{
     for (var j = 0; j <= params.rays_per_pixel; j+=1){
         let anti_aliasing = vec2<f32>(rand(&rng_state),rand(&rng_state));
         let pos = (i.pos + anti_aliasing) / i.size;
+        
+        let rd = camera.lens_radius * rand_in_unit_disk(&rng_state);
+        let offset = camera.u * rd.x + camera.v * rd.y;
+
         var ray: Ray;
-        ray.origin = camera.origin;
-        ray.dir = normalize(camera.lower_left_corner + pos.x * camera.horizontal + pos.y * camera.vertical - ray.origin);
+        ray.origin = camera.origin + offset;
+        ray.dir = camera.lower_left_corner + pos.x * camera.horizontal + pos.y * camera.vertical - ray.origin;
 
         total_incoming_light += trace(ray, &rng_state);
     } 

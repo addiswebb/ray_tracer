@@ -1,6 +1,7 @@
 use std::{path::Path};
 
 use glam::{Vec3, Vec4};
+use rand::Rng;
 use wgpu::util::DeviceExt;
 
 use crate::core::resource::load_model;
@@ -104,7 +105,9 @@ impl Scene{
             Vec3::new(-2.764473, 5.8210998, 3.839141),
             Vec3::new(-2.0999293, 5.1703076, 3.4719195),
             Vec3::new(0.0,1.0,0.0),45.0,
-            config.width as f32/config.height as f32,0.1,100.0
+            config.width as f32/config.height as f32,0.1,100.0,
+            1.0,
+            2.0,
         );
         Self{
             camera,
@@ -114,12 +117,92 @@ impl Scene{
             meshes: vec![],
         }
     }
+
+    pub async fn random_balls(device: &wgpu::Device,config: &wgpu::SurfaceConfiguration)->Self{
+        let camera = Camera::new(&device,
+            Vec3::new(13.0,2.0,3.0),
+            Vec3::new(0.0,0.0,0.0),
+            Vec3::new(0.0,1.0,0.0),45.0,
+            config.width as f32/config.height as f32,0.1,100.0,
+            0.1,
+            10.0,
+        );
+        let mut spheres: Vec<Sphere> = vec![
+            Sphere::new(
+                Vec3::new(0.0,-1000.0,0.0),1000.0,Vec4::new(0.5,0.5,0.5,1.0),Vec4::ZERO,0.0,0.0
+            )
+        ];
+
+        for a in -11..11{
+            for b in -11..11{
+                let mut rng = rand::thread_rng();
+
+                let mat = rng.gen::<f32>();
+
+                let center = Vec3::new(a as f32 + 0.9 * rng.gen::<f32>(),0.2,b as f32 + 0.9 * rng.gen::<f32>());
+                if (center - Vec3::new(4.0,0.2,0.0)).length() > 0.9{
+                    if mat < 0.8{
+                        let albedo = Vec4::new(rng.gen::<f32>(),rng.gen::<f32>(),rng.gen::<f32>(),1.0);
+                        spheres.push(Sphere::new(
+                            center,0.2,albedo,Vec4::ZERO,0.0,0.0
+                        ));
+                    }else if mat < 0.95{
+                        let albedo = Vec4::new(rng.gen_range(0.5..1.0),rng.gen_range(0.5..1.0),rng.gen_range(0.5..1.0),1.0);
+                        let fuzz = rng.gen_range(0.0..0.5);
+                        spheres.push(Sphere::new(
+                            center,0.2,albedo,Vec4::ZERO,0.0,fuzz
+                        ));
+                    }else{
+                        spheres.push(Sphere::new(
+                            center,0.2,Vec4::ONE,Vec4::ZERO,0.0,-1.0,
+                        ));
+                    }
+                }
+            }
+        }
+
+        spheres.push(Sphere::new(
+            Vec3::new(0.0,1.0,0.0),1.0,Vec4::ONE,Vec4::ZERO,0.0,-1.0
+        ));
+
+        spheres.push(Sphere::new(
+            Vec3::new(-4.0,1.0,0.0),1.0,Vec4::new(0.4,0.2,0.1,1.0),Vec4::ZERO,0.0,0.0
+        ));
+
+        spheres.push(Sphere::new(
+            Vec3::new(4.0,1.0,0.0),1.0,Vec4::new(0.7,0.6,0.5,1.0),Vec4::ZERO,0.0,0.9
+        ));
+
+        let vertices = vec![
+            Vertex::new(Vec3::new(0.0, 0.0, 1.0), Vec3::new(2.0,-3.0,-1.0)),
+        ];
+        let indices = vec![
+            1u32,
+        ];
+        let meshes = vec![
+            Mesh::new(
+                Vec3::new(0.0,0.0,0.0),
+                0, 0, 0,
+                Vec4::new(0.0,0.6,0.0,1.0),
+                Vec4::new(1.0,1.0,1.0,1.0), 0.0, 0.5,
+            ),
+        ];
+        Self{
+            camera,
+            spheres,
+            vertices,
+            indices,
+            meshes,
+        }
+    }
     pub async fn room(device: &wgpu::Device,config: &wgpu::SurfaceConfiguration)->Self{
         let camera = Camera::new(&device,
             Vec3::new(-7.0,0.0,0.0),
             Vec3::new(1.0,0.0,0.0),
             Vec3::new(0.0,1.0,0.0),45.0,
-            config.width as f32/config.height as f32,0.1,100.0
+            config.width as f32/config.height as f32,0.1,100.0,
+            0.0,
+            0.1,
         );
 
         let spheres = vec![
@@ -226,12 +309,23 @@ impl Scene{
         }
     }
     pub async fn metal(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration)->Self{
+        let lookfrom = Vec3::new(0.0,0.0,3.0);
+        let lookat = Vec3::new(0.0,0.0,-1.0);
+        // let lookfrom= Vec3::new(3.0,3.0,2.0);
+        // let lookat = Vec3::new(0.0,0.0,-1.0);
+        let length = (lookfrom - lookat).length();
+
         let camera = Camera::new(&device,
-            Vec3::new(0.0,0.0,-5.0),
-            Vec3::new(0.0,0.0,-3.0),
+            lookfrom,
+            lookat,
             Vec3::new(0.0,1.0,0.0),45.0,
-            config.width as f32/config.height as f32,0.1,100.0
+            config.width as f32/config.height as f32,0.1,100.0,
+            // 2.0,
+            // length,
+            0.0,
+            0.1,
         );
+        println!("{:?}",camera);
         let spheres = vec![
             //floor
             Sphere::new(
@@ -287,7 +381,9 @@ impl Scene{
             Vec3::new(-2.764473, 5.8210998, 3.839141),
             Vec3::new(-2.0999293, 5.1703076, 3.4719195),
             Vec3::new(0.0,1.0,0.0),45.0,
-            config.width as f32/config.height as f32,0.1,100.0
+            config.width as f32/config.height as f32,0.1,100.0,
+            0.0,
+            0.1,
         );
 /*         let camera = Camera::new(&device,Vec3::new(-5.0,-10.0,0.0),Vec3::new(-2.0,-3.0,0.0),Vec3::new(0.0,1.0,0.0),45.0,config.width as f32/config.height as f32,0.1,100.0); */
 /*         let camera = Camera::new(&device,Vec3::new(-2.7,1.3,-8.0),Vec3::new(-2.6,1.0,-7.0),Vec3::new(0.0,1.0,0.0),28.0,config.width as f32/config.height as f32,0.1,100.0); */
@@ -365,6 +461,7 @@ impl Scene{
             meshes,
         }
     }
+
     pub fn sphere_buffer(&self, device: &wgpu::Device)->wgpu::Buffer{
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor{
             label: Some("Sphere Buffer"),
