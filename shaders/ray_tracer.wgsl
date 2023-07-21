@@ -251,14 +251,15 @@ fn frag(i: FragInput) -> vec4<f32>{
     let pixel_coord = i.pos * i.size;
     var rng_state = u32(pixel_coord.y * i.size.x + pixel_coord.x)+u32(abs(params.frames)) * 71939u;
 
-    let pos = i.pos / i.size;
-    var ray: Ray;
-    ray.origin = camera.origin;
-    ray.dir = normalize(camera.lower_left_corner + pos.x * camera.horizontal + pos.y * camera.vertical - ray.origin);
-
     var total_incoming_light = vec4<f32>(0.0);
 
-    for (var i = 0; i <= params.rays_per_pixel; i+=1){
+    for (var j = 0; j <= params.rays_per_pixel; j+=1){
+        let anti_aliasing = vec2<f32>(rand(&rng_state),rand(&rng_state));
+        let pos = (i.pos + anti_aliasing) / i.size;
+        var ray: Ray;
+        ray.origin = camera.origin;
+        ray.dir = normalize(camera.lower_left_corner + pos.x * camera.horizontal + pos.y * camera.vertical - ray.origin);
+
         total_incoming_light += trace(ray, &rng_state);
     } 
 
