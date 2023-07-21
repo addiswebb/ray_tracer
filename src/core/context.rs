@@ -100,7 +100,7 @@ impl Context{
 
         let renderer = Renderer::new(&device,&queue,&texture,&config,&params_buffer,window.as_ref()).await;
 
-        let scene = Scene::room(&device, &config).await;
+        let scene = Scene::metal(&device, &config).await;
 
         let ray_tracer = RayTracer::new(&device,&texture, &params_buffer, &scene);
 

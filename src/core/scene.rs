@@ -225,6 +225,63 @@ impl Scene{
             meshes,
         }
     }
+    pub async fn metal(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration)->Self{
+        let camera = Camera::new(&device,
+            Vec3::new(0.0,0.0,-5.0),
+            Vec3::new(0.0,0.0,-3.0),
+            Vec3::new(0.0,1.0,0.0),45.0,
+            config.width as f32/config.height as f32,0.1,100.0
+        );
+        let spheres = vec![
+            //floor
+            Sphere::new(
+                Vec3::new(0.0, -100.5,-1.0),100.0, 
+                Vec4::new(0.8,0.8,0.0,1.0),
+                Vec4::new(0.0,0.0,0.0,1.0),0.0,
+                0.0,
+            ),
+            Sphere::new(
+                Vec3::new(0.0, 0.0, -1.0),0.5, 
+                Vec4::new(0.7,0.3,0.3,1.0),
+                Vec4::new(0.0,0.0,0.0,1.0),0.0,
+                0.0,
+            ),
+            Sphere::new(
+                Vec3::new(-1.0, 0.0, -1.0),-0.5, 
+                Vec4::new(0.8,0.8,0.8,1.0),
+                Vec4::new(0.0,0.0,0.0,1.0),0.0,
+                0.7,
+            ),
+            Sphere::new(
+                Vec3::new(1.0, 0.0, -1.0),0.5, 
+                Vec4::new(0.8,0.6,0.2,1.0),
+                Vec4::new(0.0,0.0,0.0,1.0),0.0,
+                0.15,
+            ),
+        ];
+        //TODO allow for no meshes or sphers in a scene
+        let vertices = vec![
+            Vertex::new(Vec3::new(0.0, 0.0, 1.0), Vec3::new(2.0,-3.0,-1.0)),
+        ];
+        let indices = vec![
+            1u32,
+        ];
+        let meshes = vec![
+            Mesh::new(
+                Vec3::new(0.0,0.0,0.0),
+                0, 0, 0,
+                Vec4::new(0.0,0.6,0.0,1.0),
+                Vec4::new(1.0,1.0,1.0,1.0), 0.0, 0.5,
+            ),
+        ];
+        Self{
+            camera,
+            spheres,
+            vertices,
+            indices,
+            meshes,
+        }
+    }
     pub async fn balls(device: &wgpu::Device,config: &wgpu::SurfaceConfiguration)->Self{
         let camera = Camera::new(&device,
             Vec3::new(-2.764473, 5.8210998, 3.839141),

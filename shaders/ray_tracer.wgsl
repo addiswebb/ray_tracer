@@ -96,7 +96,7 @@ struct Hit{
 const SKY_HORIZON: vec4<f32> = vec4<f32>(1.0,1.0,1.0,0.0);
 const SKY_ZENITH: vec4<f32> = vec4<f32>(0.0788092, 0.36480793, 0.7264151, 0.0);
 const GROUND_COLOR: vec4<f32> = vec4<f32>(0.35,0.3,0.35, 0.0);
-const SUN_INTENSITY: f32 = 10.0;
+const SUN_INTENSITY: f32 = 0.6;
 const SUN_FOCUS: f32 = 500.0;
 
 fn ray_sphere(ray: Ray, pos: vec3<f32>, radius: f32) -> Hit{
@@ -219,15 +219,12 @@ fn trace(ray: Ray, seed: ptr<function, u32>) -> vec4<f32>{
             ray.origin = hit.hit_point;
             //TODO look into different random hemisphere generators
             var diffuse_dir = rand_hemisphere_dir_dist(hit.normal, seed);
-            let specular_dir = reflect(ray.dir, hit.normal);
-
+            let specular_dir = reflect(normalize(ray.dir), hit.normal);
             ray.dir = mix(diffuse_dir,specular_dir,hit.material.smoothness);
             
             let emitted_light = hit.material.emission_color * hit.material.emission_strength;
-            //let light_stength = dot(hit.normal, ray.dir);
             incoming_light += emitted_light * ray_color;
             ray_color *= hit.material.color;
-            //* light_stength * 2.0;
         }else{
             if(params.toggle != 0){
                 incoming_light += get_environment_light(ray) * ray_color;
