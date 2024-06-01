@@ -118,9 +118,9 @@ impl Scene{
         }
     }
 
-    pub async fn random_balls(device: &wgpu::Device,config: &wgpu::SurfaceConfiguration)->Self{
+    pub fn random_balls(device: &wgpu::Device,config: &wgpu::SurfaceConfiguration)->Self{
         let camera = Camera::new(&device,
-            Vec3::new(13.0,2.0,3.0),
+            Vec3::new(10.5,2.0,3.0),
             Vec3::new(0.0,0.0,0.0),
             Vec3::new(0.0,1.0,0.0),45.0,
             config.width as f32/config.height as f32,0.1,100.0,
@@ -195,7 +195,7 @@ impl Scene{
             meshes,
         }
     }
-    pub async fn room(device: &wgpu::Device,config: &wgpu::SurfaceConfiguration)->Self{
+    pub fn room(device: &wgpu::Device,config: &wgpu::SurfaceConfiguration)->Self{
         let camera = Camera::new(&device,
             Vec3::new(-7.0,0.0,0.0),
             Vec3::new(1.0,0.0,0.0),
@@ -308,7 +308,7 @@ impl Scene{
             meshes,
         }
     }
-    pub async fn metal(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration)->Self{
+    pub fn metal(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration)->Self{
         let lookfrom = Vec3::new(0.0,0.0,3.0);
         let lookat = Vec3::new(0.0,0.0,-1.0);
         // let lookfrom= Vec3::new(3.0,3.0,2.0);
@@ -376,10 +376,10 @@ impl Scene{
             meshes,
         }
     }
-    pub async fn balls(device: &wgpu::Device,config: &wgpu::SurfaceConfiguration)->Self{
+    pub fn balls(device: &wgpu::Device,config: &wgpu::SurfaceConfiguration)->Self{
         let camera = Camera::new(&device,
-            Vec3::new(-2.764473, 5.8210998, 3.839141),
-            Vec3::new(-2.0999293, 5.1703076, 3.4719195),
+            Vec3::new(3.089,1.53,-3.0),
+            Vec3::new(-2.0,-1.0,2.0),
             Vec3::new(0.0,1.0,0.0),45.0,
             config.width as f32/config.height as f32,0.1,100.0,
             0.0,
@@ -429,28 +429,41 @@ impl Scene{
                 0.0
             )
         ];
-
-        #[allow(unused_mut)]
-        let mut vertices = vec![
+        let vertices = vec![
             Vertex::new(Vec3::new(0.0, 0.0, 1.0), Vec3::new(2.0,-3.0,-1.0)),
-            Vertex::new(Vec3::new(0.0, 0.15, 0.0), Vec3::new(4.0,-3.0, 0.0)),
-            Vertex::new(Vec3::new(1.0, 0.3, 0.0), Vec3::new(3.0,-4.0, 2.0)),
         ];
-        #[allow(unused_mut)]
-        let mut indices = vec![
-            2u32,1u32,0u32,
+        let indices = vec![
+            1u32,
         ];
-        #[allow(unused_mut)]
-        let mut meshes = vec![
+        let meshes = vec![
             Mesh::new(
                 Vec3::new(0.0,0.0,0.0),
-                0, 1, 0,
+                0, 0, 0,
                 Vec4::new(0.0,0.6,0.0,1.0),
                 Vec4::new(1.0,1.0,1.0,1.0), 0.0, 0.5,
             ),
         ];
+        // #[allow(unused_mut)]
+        // let mut vertices = vec![
+        //     Vertex::new(Vec3::new(0.0, 0.0, 1.0), Vec3::new(2.0,-3.0,-1.0)),
+        //     Vertex::new(Vec3::new(0.0, 0.15, 0.0), Vec3::new(4.0,-3.0, 0.0)),
+        //     Vertex::new(Vec3::new(1.0, 0.3, 0.0), Vec3::new(3.0,-4.0, 2.0)),
+        // ];
+        // #[allow(unused_mut)]
+        // let mut indices = vec![
+        //     2u32,1u32,0u32,
+        // ];
+        // #[allow(unused_mut)]
+        // let mut meshes = vec![
+        //     Mesh::new(
+        //         Vec3::new(0.0,0.0,0.0),
+        //         0, 1, 0,
+        //         Vec4::new(0.0,0.6,0.0,1.0),
+        //         Vec4::new(1.0,1.0,1.0,1.0), 0.0, 0.5,
+        //     ),
+        // ];
 
-        load_model(Path::new("cube2.obj"),&mut vertices, &mut indices, &mut meshes).await.unwrap();
+        //load_model(Path::new("cube2.obj"),&mut vertices, &mut indices, &mut meshes).await.unwrap();
 
 
         Self{

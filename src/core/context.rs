@@ -32,6 +32,8 @@ pub struct Context{
     pub ray_tracer: RayTracer,
     pub scene: Scene,
     pub mouse_pressed: bool,
+    pub selected_scene: i32,
+    pub prev_scene: i32,
 }
 
 impl Context{
@@ -86,7 +88,7 @@ impl Context{
             height: config.height,
             number_of_bounces: 3,
             rays_per_pixel: 1,
-            skybox: 1,
+            skybox: 0,
             frames: 0,
             accumulate: 1,
         };
@@ -100,7 +102,7 @@ impl Context{
 
         let renderer = Renderer::new(&device,&queue,&texture,&config,&params_buffer,window.as_ref()).await;
 
-        let scene = Scene::random_balls(&device, &config).await;
+        let scene = Scene::balls(&device, &config);
 
         let ray_tracer = RayTracer::new(&device,&texture, &params_buffer, &scene);
 
@@ -116,6 +118,8 @@ impl Context{
             ray_tracer,
             scene,
             mouse_pressed: false,
+            selected_scene: 0,
+            prev_scene: 0,
         }
     }
 
@@ -249,8 +253,34 @@ impl Context{
                         ui.checkbox("Accumulate", &mut accumulate);
                         ui.slider("Focus distance", 0.0, 10.0, &mut self.scene.camera.focus_dist);
                         ui.slider("Aperture", -2.0, 2.0, &mut self.scene.camera.aperture);
+                        ui.input_int("Scene ID", &mut self.selected_scene).build();
                     });
             }
+            if !(self.selected_scene==self.prev_scene){
+                println!("changeing {}",self.selected_scene);
+                match self.selected_scene{
+                    0 => {
+                        self.scene = Scene::balls(&self.device, &self.config);
+                        self.ray_tracer = RayTracer::new(&self.device,&self.texture, &self.params_buffer, &self.scene);
+                    }
+                    1 => {
+                        self.scene = Scene::random_balls(&self.device, &self.config);
+                        self.ray_tracer = RayTracer::new(&self.device,&self.texture, &self.params_buffer, &self.scene);
+                    }
+                    2 => {
+                        self.scene = Scene::room(&self.device, &self.config);
+                        self.ray_tracer = RayTracer::new(&self.device,&self.texture, &self.params_buffer, &self.scene);
+                    }
+                    3 => {
+                        self.scene = Scene::metal(&self.device, &self.config);
+                        self.ray_tracer = RayTracer::new(&self.device,&self.texture, &self.params_buffer, &self.scene);
+                    }
+                    _ => ()
+                }
+                self.params.frames = -1;
+                self.queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[self.params]));
+            }
+            self.prev_scene = self.selected_scene;
             self.params.skybox = skybox as i32;
             self.params.accumulate = accumulate as i32;
 

@@ -273,8 +273,8 @@ fn trace(ray: Ray, seed: ptr<function, u32>) -> vec4<f32>{
             ray_color *= hit.material.color;
         }else{
             if(params.toggle != 0){
+                incoming_light += get_environment_light(ray) * ray_color;
             }
-            incoming_light += get_environment_light(ray) * ray_color;
             break;
         }
     }
